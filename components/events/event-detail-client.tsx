@@ -30,6 +30,10 @@ export default function EventDetailClient({ event, billing, scheduleItems, assig
   const [showDuplicate, setShowDuplicate] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [printDeptId, setPrintDeptId] = useState('')
+
+  // Departments that have at least one assignment on this event
+  const deptsWithWork = departments.filter(d => assignments.some(a => a.department_id === d.id))
 
   const displayStatus = getDisplayStatus(event)
   const dayCount = getDayCount(event.start_date, event.end_date)
@@ -119,6 +123,42 @@ export default function EventDetailClient({ event, billing, scheduleItems, assig
           </button>
         </div>
       )}
+
+      {/* PDF print bar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <a
+          href={`/api/pdf/event/${event.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs border border-cream-300 text-brown-500 hover:bg-cream-100 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          Print Full Plan
+        </a>
+        {deptsWithWork.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <select
+              value={printDeptId}
+              onChange={e => setPrintDeptId(e.target.value)}
+              className="text-xs border border-cream-300 rounded-lg px-2 py-1.5 bg-white text-brown-500 focus:outline-none focus:ring-1 focus:ring-brown-300"
+            >
+              <option value="">Dept Sheet…</option>
+              {deptsWithWork.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+            {printDeptId && (
+              <a
+                href={`/api/pdf/event/${event.id}/dept/${printDeptId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs border border-cream-300 text-brown-500 hover:bg-cream-100 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Print
+              </a>
+            )}
+          </div>
+        )}
+      </div>
 
       <EventInfoSection event={event} canEdit={canEdit} />
       <ContactsSection event={event} canEdit={canEdit} />
