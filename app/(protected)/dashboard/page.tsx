@@ -1,29 +1,40 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { todayInPhoenix } from '@/lib/time'
+import EventsList from '@/components/dashboard/events-list'
+import type { Event } from '@/lib/types'
 
 export default async function DashboardPage() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase
-    .from('profiles')
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user!.id).single()
+
+  const today = todayInPhoenix()
+  const { data } = await supabase
+    .from('events')
     .select('*')
-    .eq('id', user!.id)
-    .single()
+    .order('start_date', { ascending: true })
+
+  const events = (data ?? []) as Event[]
+  const upcoming = events.filter(e => e.end_date >= today)
+  const past = events.filter(e => e.end_date < today).reverse()
+
+  const canEdit = profile?.role === 'admin' || profile?.role === 'planner'
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-brown-500">Dashboard</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-brown-700">Events</h1>
+        {canEdit && (
+          <Link
+            href="/events/new"
+            className="bg-brown-500 hover:bg-brown-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            + New Event
+          </Link>
+        )}
       </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-cream-200 p-6 max-w-lg">
-        <p className="text-brown-600">
-          Welcome, <span className="font-semibold">{profile?.full_name || user?.email}</span>.
-        </p>
-        <p className="text-sm text-brown-300 mt-1 capitalize">Role: {profile?.role}</p>
-        <p className="text-sm text-brown-300 mt-4">
-          Events and assignments are coming in Phase 3 and 4.
-        </p>
-      </div>
+      <EventsList upcoming={upcoming} past={past} />
     </div>
   )
 }
