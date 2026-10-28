@@ -6,6 +6,7 @@ import { createEvent } from '@/app/actions/events'
 import { EVENT_TYPES } from '@/lib/events'
 import { todayInPhoenix } from '@/lib/time'
 import type { EventType } from '@/lib/types'
+import TimePicker from '@/components/ui/time-picker'
 
 export default function CreateEventForm() {
   const router = useRouter()
@@ -129,21 +130,11 @@ export default function CreateEventForm() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-brown-400 mb-1">Arrival / Start Time</label>
-            <input
-              type="time"
-              value={startTime}
-              onChange={e => setStartTime(e.target.value)}
-              className="w-full border border-cream-300 rounded-lg px-3 py-2 text-sm bg-cream-50 focus:outline-none focus:ring-2 focus:ring-brown-300"
-            />
+            <TimePicker size="md" value={startTime} onChange={setStartTime} placeholder="None" />
           </div>
           <div>
             <label className="block text-xs font-medium text-brown-400 mb-1">End Time</label>
-            <input
-              type="time"
-              value={endTime}
-              onChange={e => setEndTime(e.target.value)}
-              className="w-full border border-cream-300 rounded-lg px-3 py-2 text-sm bg-cream-50 focus:outline-none focus:ring-2 focus:ring-brown-300"
-            />
+            <TimePicker size="md" value={endTime} onChange={setEndTime} placeholder="None" />
           </div>
         </div>
 

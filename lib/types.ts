@@ -83,6 +83,8 @@ export type ScheduleItem = {
   updated_at: string
 }
 
+export type TimeType = 'at' | 'by'
+
 export type Assignment = {
   id: string
   event_id: string
@@ -90,6 +92,7 @@ export type Assignment = {
   task: string
   task_date: string          // 'YYYY-MM-DD'
   task_time: string | null   // 'HH:MM'; null = untimed / shows under "General"
+  time_type: TimeType        // 'at' = happens at that time; 'by' = must be done by that time
   notes: string | null
   completed_at: string | null
   completed_by: string | null
@@ -143,7 +146,7 @@ export type Database = {
       }
       assignments: {
         Row: Assignment
-        Insert: Omit<Assignment, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Insert: Omit<Assignment, 'id' | 'created_at' | 'updated_at' | 'time_type' | 'completed_at' | 'completed_by'> & { id?: string; created_at?: string; updated_at?: string; time_type?: TimeType; completed_at?: string | null; completed_by?: string | null }
         Update: Partial<Omit<Assignment, 'id'>>
         Relationships: []
       }

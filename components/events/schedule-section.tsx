@@ -6,6 +6,7 @@ import type { Event, ScheduleItem } from '@/lib/types'
 import { createScheduleItem, updateScheduleItem, deleteScheduleItem } from '@/app/actions/schedule-items'
 import { formatDate, formatTime } from '@/lib/time'
 import { getDayCount, shiftDate } from '@/lib/events'
+import TimePicker from '@/components/ui/time-picker'
 
 function blankForm(defaultDate: string) {
   return { item_date: defaultDate, start_time: '', end_time: '', title: '', location: '', notes: '' }
@@ -70,13 +71,11 @@ function ItemRow({
           </div>
           <div>
             <label className="block text-xs text-brown-300 mb-0.5">Start</label>
-            <input type="time" value={form.start_time} onChange={e => set('start_time', e.target.value)}
-              className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300" />
+            <TimePicker value={form.start_time} onChange={v => set('start_time', v)} />
           </div>
           <div>
             <label className="block text-xs text-brown-300 mb-0.5">End</label>
-            <input type="time" value={form.end_time} onChange={e => set('end_time', e.target.value)}
-              className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300" />
+            <TimePicker value={form.end_time} onChange={v => set('end_time', v)} />
           </div>
         </div>
         <div>
@@ -122,7 +121,7 @@ function ItemRow({
         )}
       </div>
       {canEdit && (
-        <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity shrink-0">
+        <div className="flex gap-1 shrink-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:transition-opacity">
           <button onClick={() => setEditing(true)} className="text-xs text-brown-400 hover:text-brown-600 px-1">Edit</button>
           <button onClick={handleDelete} className="text-xs text-red-400 hover:text-red-600 px-1">✕</button>
         </div>
@@ -203,13 +202,11 @@ export default function ScheduleSection({
             </div>
             <div>
               <label className="block text-xs text-brown-300 mb-0.5">Start</label>
-              <input type="time" value={addForm.start_time} onChange={e => setAdd('start_time', e.target.value)}
-                className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300" />
+              <TimePicker value={addForm.start_time} onChange={v => setAdd('start_time', v)} />
             </div>
             <div>
               <label className="block text-xs text-brown-300 mb-0.5">End</label>
-              <input type="time" value={addForm.end_time} onChange={e => setAdd('end_time', e.target.value)}
-                className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300" />
+              <TimePicker value={addForm.end_time} onChange={v => setAdd('end_time', v)} />
             </div>
           </div>
           <div>
