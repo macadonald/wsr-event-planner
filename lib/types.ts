@@ -1,8 +1,9 @@
+// Using `type` (not `interface`) — required so Row extends Record<string, unknown>
+// passes Supabase's GenericSchema conditional type check.
+
 export type Role = 'admin' | 'planner' | 'viewer'
 export type EventStatus = 'planning' | 'finalized'
-
-// Using `type` (not `interface`) so Row extends Record<string, unknown> passes
-// Supabase's GenericSchema conditional type check.
+export type EventType = 'In-House Group' | 'Outside Group' | 'Wedding' | 'Ranch Event' | 'Other'
 
 export type Profile = {
   id: string
@@ -33,12 +34,49 @@ export type DepartmentRecipient = {
 export type Event = {
   id: string
   name: string
-  event_date: string        // 'YYYY-MM-DD' — never parse with new Date()
+  event_type: EventType | null
+  start_date: string        // 'YYYY-MM-DD' — never parse with new Date()
+  end_date: string          // 'YYYY-MM-DD'
   start_time: string | null // 'HH:MM'
   end_time: string | null
+  pax: number | null
   location: string | null
+  contact_name: string | null
+  contact_phone: string | null
+  contact_email: string | null
+  onsite_contact: string | null
   description: string | null
+  special_notes: string | null
   status: EventStatus
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type EventBilling = {
+  id: string
+  event_id: string
+  room_rental: number | null
+  billing_due_date: string | null // 'YYYY-MM-DD'
+  billing_method: string | null
+  package: string | null
+  notes: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ScheduleItem = {
+  id: string
+  event_id: string
+  item_date: string        // 'YYYY-MM-DD'
+  start_time: string | null // 'HH:MM'
+  end_time: string | null
+  title: string
+  location: string | null
+  notes: string | null
   created_by: string | null
   updated_by: string | null
   created_at: string
@@ -50,8 +88,8 @@ export type Assignment = {
   event_id: string
   department_id: string
   task: string
-  task_date: string  // 'YYYY-MM-DD'
-  task_time: string  // 'HH:MM'
+  task_date: string          // 'YYYY-MM-DD'
+  task_time: string | null   // 'HH:MM'; null = untimed / shows under "General"
   notes: string | null
   completed_at: string | null
   completed_by: string | null
@@ -60,6 +98,9 @@ export type Assignment = {
   created_at: string
   updated_at: string
 }
+
+// Convenience join types used by queries with nested selects
+export type DepartmentWithRecipients = Department & { department_recipients: DepartmentRecipient[] }
 
 export type Database = {
   public: {
@@ -86,6 +127,18 @@ export type Database = {
         Row: Event
         Insert: Omit<Event, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
         Update: Partial<Omit<Event, 'id'>>
+        Relationships: []
+      }
+      event_billing: {
+        Row: EventBilling
+        Insert: Omit<EventBilling, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<Omit<EventBilling, 'id'>>
+        Relationships: []
+      }
+      schedule_items: {
+        Row: ScheduleItem
+        Insert: Omit<ScheduleItem, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<Omit<ScheduleItem, 'id'>>
         Relationships: []
       }
       assignments: {

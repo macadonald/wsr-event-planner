@@ -6,14 +6,14 @@
 - Never read, edit, or run commands in any other project folder — especially `~/Downloads/Ranch App Main/ranch-horse-app`, which is a separate live app.
 
 ## What this app is
-An internal web app for White Stallion Ranch. Event planners create an event, add tasks ("what needs to be done"), assign each task to a department with a date and time, and print PDFs: one full event plan, and one page per department.
+An internal web app for White Stallion Ranch. Event planners create BEO-style events (Banquet Event Orders), add a guest-facing schedule, assign department tasks, and print PDFs: a compact Full Event Plan and per-department run sheets.
 
-Primary flow, all on ONE event page: **Create Event → Add Assignments → Review → Print PDFs**
+Primary flow, all on ONE event page: **Create Event → Edit BEO Details → Add Schedule → Add Assignments → Review → Print PDFs**
 
 ## Users and roles
 - **admin** — T Mac. Everything, plus managing users and departments.
-- **planner** — 2 to start, growing to ~8+. Create, edit, duplicate, and delete events and assignments.
-- **viewer** — read-only for now. (Future: can mark assignments done.)
+- **planner** — 2 to start, growing to ~8+. Create, edit, duplicate, and delete events, schedule items, and assignments.
+- **viewer** — read-only for now. (Future: can mark assignments done.) Viewers never see billing.
 - **Invite-only.** Public sign-up must be disabled. Only an admin can invite or deactivate users, from an in-app Users page.
 - Bootstrap: the first admin is set by a one-time SQL update on their `profiles` row (document this in README).
 - Show "Last edited by {name} at {time}" on every event.
@@ -57,55 +57,103 @@ department_recipients          -- stored now, used by email in a later phase
 
 events
   id uuid PK, name text NOT NULL
-  event_date date NOT NULL, start_time time, end_time time
-  location text, description text
+  event_type text CHECK (event_type IN ('In-House Group','Outside Group','Wedding','Ranch Event','Other'))
+  start_date date NOT NULL, end_date date NOT NULL   -- multi-day; day count is calculated not stored
+  start_time time, end_time time                      -- optional
+  pax integer                                         -- guest count
+  location text                                       -- e.g. "Longhorn/Sunrise"
+  contact_name text, contact_phone text, contact_email text
+  onsite_contact text
+  description text, special_notes text
   status text CHECK (status IN ('planning','finalized')) DEFAULT 'planning'
+  created_by, updated_by → profiles
+  created_at, updated_at timestamptz
+
+event_billing                                          -- one row per event; admin+planner only, never on dept PDFs
+  id uuid PK, event_id → events ON DELETE CASCADE
+  room_rental numeric
+  billing_due_date date
+  billing_method text, package text, notes text
+  created_by, updated_by → profiles
+  created_at, updated_at timestamptz
+
+schedule_items                                         -- guest-facing agenda, shown day by day
+  id uuid PK, event_id → events ON DELETE CASCADE
+  item_date date NOT NULL
+  start_time time, end_time time                       -- end_time optional
+  title text NOT NULL                                  -- e.g. "Group Ride"
+  location text, notes text
   created_by, updated_by → profiles
   created_at, updated_at timestamptz
 
 assignments
   id uuid PK, event_id → events ON DELETE CASCADE
   department_id → departments ON DELETE RESTRICT
-  task text NOT NULL, task_date date NOT NULL, task_time time NOT NULL
+  task text NOT NULL, task_date date NOT NULL           -- task_date defaults to event start_date
+  task_time time                                        -- optional; NULL = untimed / "General"
   notes text
   completed_at timestamptz NULL, completed_by → profiles NULL   -- future "mark done"
   created_by, updated_by → profiles
   created_at, updated_at timestamptz
 ```
-- Triggers keep `updated_at` / `updated_by` current. Any insert/update/delete on `assignments` also bumps the parent event's `updated_at` / `updated_by`.
-- Displayed status: **Completed** is derived (event_date before today in Phoenix), not stored. Otherwise show Planning or Finalized.
-- Seed departments: Corral, Activities, Kitchen, Office, Housekeeping, Maintenance, each with a distinct earthy color.
-- Add indexes on `assignments(event_id)`, `assignments(department_id)`, `events(event_date)`.
+- Triggers keep `updated_at` / `updated_by` current. Any insert/update/delete on `assignments` or `schedule_items` also bumps the parent event's `updated_at` / `updated_by`.
+- Displayed status: **Completed** is derived (start_date before today in Phoenix), not stored. Otherwise show Planning or Finalized.
+- Seed departments (10 total): Corral, Activities, Kitchen, Office, Housekeeping, Maintenance, Set-Up, Audio Visual, Front Desk, Bar — each with a distinct earthy/muted color.
+- Indexes: `assignments(event_id)`, `assignments(department_id)`, `schedule_items(event_id)`, `events(start_date)`, `events(end_date)`.
 
 ## Row Level Security
-- Helper SQL function `current_role()` (security definer) returns the caller's role if their profile is active, else null.
-- Any active user: read everything.
-- admin + planner: insert/update/delete events and assignments.
+- Helper SQL function `get_user_role()` (security definer) returns the caller's role if their profile is active, else null.
+- Any active user: read events, assignments, schedule_items, departments, profiles.
+- admin + planner: insert/update/delete events, assignments, schedule_items.
+- **event_billing: admin + planner read AND write. Viewers cannot see billing at all.**
 - admin only: departments, department_recipients, and profile role/active changes.
 - viewer: read-only. (Future: may update only `completed_at` / `completed_by` on assignments.)
 - Inactive users get nothing.
 
 ## Features (v1)
 **Dashboard**
-- Upcoming events (soonest first), then past events. Search by name.
+- Upcoming events (soonest first by start_date), then past events. Search by name.
 - Status badge per event. "Create New Event" button.
 
 **Event page** (everything happens here)
-- Event details, editable inline.
-- Add-assignment form right on the page: Task, Department (dropdown of active departments), Date (defaults to event date), Time, Notes.
-- Assignment list: chronological by date + time, department color chips, filter by department, edit, delete (with confirm).
-- "Duplicate event": copies details and all assignments into a new event. Ask for the new date and shift every task date by the same number of days.
-- Print buttons (see PDFs).
+
+*BEO header:* Group name, event type, dates (start–end with day count), pax, times, location. Inline editable.
+
+*Contact section:* contact_name, contact_phone, contact_email, onsite_contact. Inline editable.
+
+*Billing section (admin + planner only — hidden from viewers entirely):* room_rental, billing_due_date, billing_method, package, notes. Inline editable. Never appears on department PDFs or run sheets.
+
+*Schedule section:* Day-by-day list of schedule_items. Add/edit/delete per item. Shows title, time(s), location.
+
+*Assignments section:* Add-assignment form: Task, Department (dropdown of active departments), Date (defaults to event start_date), Time (optional), Notes. Assignment list grouped by department or by date — user can toggle. Within each group, untimed tasks appear first under a "General" heading, then timed tasks in chronological order. Department color chips, filter by department, edit, delete (with confirm).
+
+*"Duplicate event":* copies details, billing, schedule items, and all assignments into a new event. Prompt for new start date; shift all dates by the same number of days (preserving relative offsets for multi-day events).
+
+*"Last edited by {name} at {time}"* shown on the page.
 
 **Settings** (admin)
-- Departments: add, rename, recolor, reorder, deactivate (deactivated departments stay on old events but aren't offered for new tasks). Add/remove recipient emails per department.
+- Departments: add, rename, recolor, reorder (drag or arrows), deactivate (deactivated departments stay on old events but aren't offered for new tasks). Add/remove recipient emails per department.
 - Users: invite by email with role, change role, deactivate.
 
 **PDFs** (server-generated, open in a new tab for print/download)
-1. **Full Event Plan** — ranch name, event name, date, time, location, description, then all assignments. Toggle: chronological, or grouped by department.
-2. **Single department** — event info header plus only that department's tasks.
-3. **All departments packet** — one PDF, each department on its own page. For printing everything at once.
-- Clean, readable, print-friendly (Letter size). Ranch logo from `public/logo.png` if present; fall back to text.
+
+Goal: **less paper**. Compact, efficient layouts. Small but readable type (9–10pt body). Skip any section or department that has nothing in it. No empty boxes or blank field labels.
+
+1. **Full Event Plan** — aim for ONE page per event. Sections in BEO order:
+   - Header: group name, dates, event type, "Last updated by X at T"
+   - Contact: name, phone, email, onsite contact
+   - Event details: day count, dates, times, pax, location
+   - Billing: room rental, due date, method, package, notes *(admin+planner only — omit entirely if viewer generates PDF)*
+   - Schedule: grouped by day, each item one line (time – title – location)
+   - Department coordination: for each department that has tasks, list them in order (untimed "General" first, then timed). Skip departments with no tasks. Department order: Set-Up, Audio Visual, Front Desk, Housekeeping, Maintenance, Kitchen, Activities, Corral, Bar.
+   - Special notes
+
+2. **Department sheet** (one event, one department) — compact event header + condensed schedule + only that department's tasks (untimed first, then timed). No billing.
+
+3. **Department Run Sheet** — pick a department + date range (default: this week Mon–Sun). Lists that department's tasks across **all events** in that range, grouped by day, then by time. Each line: time (or "General"), task, event name, location. No billing. Also an **"All departments"** option that prints each department's run sheet on its own page — this is the main printout for busy multi-group weeks.
+
+- Letter size, print-friendly. Ranch logo from `public/logo.png` if present; fall back to text header.
+- PDF route handlers live in `app/api/pdf/`. PDF React components live in `lib/pdf/` (no UI imports).
 
 ## Design
 - Clean, simple, minimal training needed. Subtle ranch feel: warm neutrals, saddle-brown primary (~#5A3A22), cream backgrounds, simple serif for headings.
@@ -115,16 +163,17 @@ assignments
 ## LATER — do NOT build until asked
 - Email via Resend: send each department its PDF, preview before sending, send log with delivery status, "Send Updated Assignments" (only to departments whose tasks changed, marked REVISED). Never auto-send on edit.
 - Viewer "mark done" on assignments.
-- Calendar view, reminders, reusable task templates.
+- Calendar tab: month/week view of all events.
+- Reminders, reusable task templates.
 
 ## How to work
 - Build in the phases below. After each phase: `npm run build` must pass, commit to git with a clear message, then STOP and tell T Mac what to test.
 - Ask before adding any new paid service or dependency not listed here.
 
 ### Phases
-1. Scaffold Next.js app, connect Supabase, migrations for all tables + RLS + seeds, login page, invite-only auth, role loading, protected routes.
+1. ✅ Scaffold Next.js app, connect Supabase, migrations for all tables + RLS + seeds, login page, invite-only auth, role loading, protected routes.
 2. Settings: departments (and recipients) + users page.
-3. Dashboard + create/edit/duplicate events.
-4. Assignments on the event page (add, edit, delete, sort, filter).
-5. PDFs (full plan, single department, all-departments packet).
+3. Dashboard + create/edit/duplicate events (BEO fields, contacts, billing, schedule items).
+4. Assignments on the event page (add, edit, delete, sort, filter; untimed "General" grouping).
+5. PDFs (Full Event Plan, Department sheet, Department Run Sheet).
 6. Deploy to Vercel, README with setup steps.
