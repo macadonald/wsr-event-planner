@@ -3,51 +3,152 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { Assignment, Department, Event, EventBilling, ScheduleItem } from '@/lib/types'
 import { formatDate, formatTime, formatTimestamp } from '@/lib/time'
 import { getDayCount, formatDateRange, shiftDate } from '@/lib/events'
-import { sortDeptsByPdfOrder, taskTimeLabel, C } from './shared'
+import { sortDeptsByPdfOrder, bandColor, tint, C, T, SP } from './shared'
 
+// ── styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 9, color: C.brown, paddingHorizontal: 36, paddingVertical: 30 },
+  page: {
+    fontFamily: 'Helvetica',
+    fontSize: T.body,
+    color: C.body,
+    paddingHorizontal: SP.pagePadX,
+    paddingVertical: SP.pagePadY,
+    lineHeight: 1.35,
+  },
 
   // Header
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 6, borderBottomWidth: 0.75, borderBottomColor: C.border, marginBottom: 7 },
-  brandName: { fontFamily: 'Helvetica-Bold', fontSize: 11, color: C.brown },
-  brandSub: { fontSize: 7, color: C.brownLight, marginTop: 1 },
-  headerRight: { alignItems: 'flex-end' },
-  eventName: { fontFamily: 'Helvetica-Bold', fontSize: 13, color: C.brown },
-  eventMeta: { fontSize: 8, color: C.brownMid, marginTop: 2 },
-  updatedLine: { fontSize: 7, color: C.gray, marginTop: 1 },
+  headerWrap: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingBottom: 6,
+    marginBottom: SP.ruleGap,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  brandBlock: { gap: 1 },
+  brandName: { fontFamily: 'Helvetica-Bold', fontSize: T.brandName, color: C.brown },
+  brandSub: { fontSize: T.small, color: C.label },
+  eventBlock: { alignItems: 'flex-end', gap: 2 },
+  eventName: { fontFamily: 'Helvetica-Bold', fontSize: T.eventName, color: C.brown },
+  eventMeta: { fontSize: T.small, color: C.brownMid },
+  eventUpdated: { fontSize: T.note, color: C.small },
+
+  // Rule separator
+  rule: { borderBottomWidth: 0.5, borderBottomColor: C.borderFaint, marginBottom: SP.ruleGap },
 
   // Section label
-  secLabel: { fontFamily: 'Helvetica-Bold', fontSize: 6.5, color: C.brownLight, marginBottom: 3, letterSpacing: 0.5 },
+  secLabel: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: T.secLabel,
+    color: C.label,
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
 
   // Info strip (3 columns)
-  infoStrip: { flexDirection: 'row', gap: 10, marginBottom: 7, paddingBottom: 7, borderBottomWidth: 0.5, borderBottomColor: C.borderLight },
+  infoStrip: {
+    flexDirection: 'row',
+    paddingVertical: 5,
+    marginBottom: SP.ruleGap,
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.borderFaint,
+  },
   infoCol: { flex: 1 },
-  infoKey: { fontSize: 7, color: C.gray, marginBottom: 0.5 },
-  infoVal: { fontSize: 8.5, color: C.brown, marginBottom: 2.5 },
+  infoDivider: { width: 0.5, backgroundColor: C.borderFaint, marginHorizontal: 10 },
+  infoLabel: { fontSize: T.note, color: C.small, marginBottom: 0.5 },
+  infoVal: { fontSize: T.body, color: C.body, marginBottom: 2 },
+  infoSm: { fontSize: T.small, color: C.label, marginBottom: 1 },
 
   // Schedule
-  schedSec: { marginBottom: 7, paddingBottom: 7, borderBottomWidth: 0.5, borderBottomColor: C.borderLight },
-  schedDayRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 0 },
-  dayBlock: { marginBottom: 5, paddingRight: 8 },
-  dayHead: { fontFamily: 'Helvetica-Bold', fontSize: 7.5, color: C.brown, marginBottom: 2 },
-  schedItem: { fontSize: 8, color: C.brown, marginBottom: 1 },
-  schedTime: { color: C.brownLight },
+  schedWrap: { marginBottom: SP.sectionGap },
+  dayColumns: { flexDirection: 'row' },
+  dayCol: { flex: 1, paddingRight: 8 },
+  dayHead: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: T.small,
+    color: C.brown,
+    paddingBottom: 2,
+    marginBottom: 2,
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.borderFaint,
+  },
+  schedRow: { flexDirection: 'row', marginBottom: 1.5 },
+  schedTime: { width: 42, fontSize: T.small, color: C.label, flexShrink: 0 },
+  schedTitle: { flex: 1, fontSize: T.small, color: C.body },
 
-  // Dept coordination
-  deptSec: { marginBottom: 7 },
-  deptGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  deptBlock: { width: '50%', marginBottom: 6, paddingRight: 12 },
-  deptHead: { fontFamily: 'Helvetica-Bold', fontSize: 7.5, color: C.brown, marginBottom: 2, borderBottomWidth: 0.5, borderBottomColor: C.borderLight, paddingBottom: 1 },
-  deptTaskRow: { flexDirection: 'row', marginBottom: 1.5 },
-  deptTaskTime: { fontSize: 7.5, color: C.brownLight, width: 52, flexShrink: 0 },
-  deptTaskText: { fontSize: 8, color: C.brown, flex: 1 },
+  // Dept grid
+  deptWrap: { marginBottom: SP.sectionGap },
+  deptRow: { flexDirection: 'row', gap: 5, marginBottom: 5 },
+  deptBlock: { flex: 1 },
+  deptBand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.cellPadH,
+    paddingVertical: 3,
+  },
+  deptBandName: { fontFamily: 'Helvetica-Bold', fontSize: T.small, color: C.white },
+  taskRow: { flexDirection: 'row', paddingHorizontal: SP.cellPadH, paddingVertical: SP.rowPadV },
+  taskTimeCol: { width: SP.timeColW, flexShrink: 0 },
+  taskTimeText: { fontSize: T.small, color: C.label },
+  taskTimeBold: { fontFamily: 'Helvetica-Bold', fontSize: T.small, color: C.label },
+  taskBody: { flex: 1 },
+  taskText: { fontSize: T.body, color: C.body },
+  taskNote: { fontSize: T.note, color: C.note, marginTop: 0.5 },
 
   // Notes
-  notesSec: { marginTop: 4 },
-  notesText: { fontSize: 8.5, color: C.brown },
+  notesWrap: { paddingTop: 4, borderTopWidth: 0.5, borderTopColor: C.borderFaint },
+  notesText: { fontSize: T.body, color: C.body },
 })
 
+// ── sub-components ────────────────────────────────────────────────────────────
+
+function SecLabel({ text }: { text: string }) {
+  return <Text style={s.secLabel}>{text}</Text>
+}
+
+function Rule() {
+  return <View style={s.rule} />
+}
+
+function DeptBlock({ dept, assignments }: { dept: Department; assignments: Assignment[] }) {
+  const untimed = assignments.filter(a => !a.task_time)
+  const timed = assignments.filter(a => a.task_time).sort((a, b) => (a.task_time! > b.task_time! ? 1 : -1))
+  const allRows = [...untimed, ...timed]
+  const band = bandColor(dept.color)
+  const rowTint = tint(dept.color, 0.08)
+
+  return (
+    <View style={s.deptBlock}>
+      <View style={[s.deptBand, { backgroundColor: band }]}>
+        <Text style={s.deptBandName}>{dept.name.toUpperCase()}</Text>
+      </View>
+      {allRows.map((a, i) => {
+        const isUntimed = !a.task_time
+        const bg = i % 2 === 0 ? C.white : rowTint
+        return (
+          <View key={a.id} style={[s.taskRow, { backgroundColor: bg }]}>
+            <View style={s.taskTimeCol}>
+              {isUntimed ? (
+                <Text style={s.taskTimeText}>General</Text>
+              ) : (
+                <Text style={s.taskTimeText}>
+                  <Text style={s.taskTimeBold}>{a.time_type === 'by' ? 'By ' : 'At '}</Text>
+                  {formatTime(a.task_time!)}
+                </Text>
+              )}
+            </View>
+            <View style={s.taskBody}>
+              <Text style={s.taskText}>{a.task}</Text>
+            </View>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
+// ── main component ────────────────────────────────────────────────────────────
 type Props = {
   event: Event
   billing: EventBilling | null
@@ -62,19 +163,23 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
   const dayCount = getDayCount(event.start_date, event.end_date)
   const dateRange = formatDateRange(event.start_date, event.end_date)
 
-  // Schedule: group by date
+  // Meta line: dates · days · type · pax
+  const metaParts: string[] = [dateRange]
+  if (dayCount > 1) metaParts.push(`${dayCount} days`)
+  if (event.event_type) metaParts.push(event.event_type)
+  if (event.pax != null) metaParts.push(`${event.pax} guests`)
+
+  // Schedule: days with items
   const allDays = Array.from({ length: dayCount }, (_, i) => shiftDate(event.start_date, i))
   const schedByDate = new Map<string, ScheduleItem[]>()
   for (const item of scheduleItems) {
-    const key = item.item_date
-    if (!schedByDate.has(key)) schedByDate.set(key, [])
-    schedByDate.get(key)!.push(item)
+    if (!schedByDate.has(item.item_date)) schedByDate.set(item.item_date, [])
+    schedByDate.get(item.item_date)!.push(item)
   }
-  // days that have items
   const activeDays = allDays.filter(d => (schedByDate.get(d)?.length ?? 0) > 0)
 
-  // Assignments: grouped by dept in PDF order, skip depts with no assignments
-  const deptsWithAssignments = sortDeptsByPdfOrder(
+  // Departments that have assignments, in PDF order
+  const deptsWithWork = sortDeptsByPdfOrder(
     departments.filter(d => assignments.some(a => a.department_id === d.id))
   )
   const assignsByDept = new Map<string, Assignment[]>()
@@ -83,37 +188,36 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
     assignsByDept.get(a.department_id)!.push(a)
   }
 
-  const hasBilling = showBilling && billing && (
+  const hasBillingData = showBilling && billing && (
     billing.room_rental != null || billing.billing_due_date ||
     billing.billing_method || billing.package || billing.notes
   )
 
-  // Schedule column width: if ≤4 days use 50%, otherwise list all vertically
-  const multiColSched = activeDays.length >= 2 && activeDays.length <= 6
-  const dayColWidth = activeDays.length <= 2 ? '50%'
-    : activeDays.length <= 3 ? '33.3%'
-    : activeDays.length <= 4 ? '25%'
-    : '50%'
+  // Schedule column layout
+  const dayChunks: string[][] = []
+  if (activeDays.length <= 3) {
+    dayChunks.push(activeDays)
+  } else {
+    for (let i = 0; i < activeDays.length; i += 2) {
+      dayChunks.push(activeDays.slice(i, i + 2))
+    }
+  }
 
   return (
     <Document>
       <Page size="LETTER" style={s.page}>
 
         {/* ── Header ── */}
-        <View style={s.headerRow}>
-          <View>
+        <View style={s.headerWrap}>
+          <View style={s.brandBlock}>
             <Text style={s.brandName}>WSR Events</Text>
             <Text style={s.brandSub}>White Stallion Ranch</Text>
           </View>
-          <View style={s.headerRight}>
+          <View style={s.eventBlock}>
             <Text style={s.eventName}>{event.name}</Text>
-            <Text style={s.eventMeta}>
-              {dateRange}
-              {dayCount > 1 ? ` · ${dayCount} days` : ''}
-              {event.event_type ? ` · ${event.event_type}` : ''}
-            </Text>
+            <Text style={s.eventMeta}>{metaParts.join('  ·  ')}</Text>
             {updatedByName && (
-              <Text style={s.updatedLine}>Updated by {updatedByName} · {formatTimestamp(event.updated_at)}</Text>
+              <Text style={s.eventUpdated}>Updated by {updatedByName}  ·  {formatTimestamp(event.updated_at)}</Text>
             )}
           </View>
         </View>
@@ -123,138 +227,110 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
           {/* Contact */}
           <View style={s.infoCol}>
             <Text style={s.secLabel}>CONTACT</Text>
-            {event.contact_name && <Text style={s.infoVal}>{event.contact_name}</Text>}
-            {event.contact_phone && <Text style={s.infoKey}>{event.contact_phone}</Text>}
-            {event.contact_email && <Text style={s.infoKey}>{event.contact_email}</Text>}
-            {event.onsite_contact && (
-              <Text style={s.infoKey}>On-site: {event.onsite_contact}</Text>
-            )}
-            {!event.contact_name && !event.contact_phone && !event.contact_email && !event.onsite_contact && (
-              <Text style={s.infoKey}>—</Text>
-            )}
+            {event.contact_name
+              ? <Text style={s.infoVal}>{event.contact_name}</Text>
+              : <Text style={s.infoSm}>—</Text>
+            }
+            {event.contact_phone && <Text style={s.infoSm}>{event.contact_phone}</Text>}
+            {event.contact_email && <Text style={s.infoSm}>{event.contact_email}</Text>}
+            {event.onsite_contact && <Text style={s.infoSm}>On-site: {event.onsite_contact}</Text>}
           </View>
+
+          <View style={s.infoDivider} />
 
           {/* Event details */}
           <View style={s.infoCol}>
             <Text style={s.secLabel}>EVENT DETAILS</Text>
-            {event.pax != null && <Text style={s.infoVal}>{event.pax} guests</Text>}
             {event.location && <Text style={s.infoVal}>{event.location}</Text>}
+            {event.pax != null && <Text style={s.infoSm}>{event.pax} guests</Text>}
             {(event.start_time || event.end_time) && (
-              <Text style={s.infoKey}>
-                {event.start_time ? `Arrive ${formatTime(event.start_time)}` : ''}
+              <Text style={s.infoSm}>
+                {event.start_time ? formatTime(event.start_time) : ''}
                 {event.start_time && event.end_time ? ' – ' : ''}
-                {event.end_time ? `Depart ${formatTime(event.end_time)}` : ''}
+                {event.end_time ? formatTime(event.end_time) : ''}
               </Text>
             )}
-            {event.description && <Text style={s.infoKey}>{event.description}</Text>}
+            {event.description && <Text style={s.infoSm}>{event.description}</Text>}
           </View>
 
-          {/* Billing (admin/planner only) */}
-          {hasBilling ? (
-            <View style={s.infoCol}>
-              <Text style={s.secLabel}>BILLING</Text>
-              {billing!.room_rental != null && (
-                <Text style={s.infoVal}>${billing!.room_rental.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
-              )}
-              {billing!.billing_due_date && (
-                <Text style={s.infoKey}>Due {formatDate(billing!.billing_due_date)}</Text>
-              )}
-              {billing!.billing_method && <Text style={s.infoKey}>{billing!.billing_method}</Text>}
-              {billing!.package && <Text style={s.infoKey}>{billing!.package}</Text>}
-              {billing!.notes && <Text style={s.infoKey}>{billing!.notes}</Text>}
-            </View>
+          {/* Billing or spacer */}
+          {hasBillingData ? (
+            <>
+              <View style={s.infoDivider} />
+              <View style={s.infoCol}>
+                <Text style={s.secLabel}>BILLING</Text>
+                {billing!.room_rental != null && (
+                  <Text style={s.infoVal}>${billing!.room_rental.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                )}
+                {billing!.billing_due_date && <Text style={s.infoSm}>Due {formatDate(billing!.billing_due_date)}</Text>}
+                {billing!.billing_method && <Text style={s.infoSm}>{billing!.billing_method}</Text>}
+                {billing!.package && <Text style={s.infoSm}>{billing!.package}</Text>}
+                {billing!.notes && <Text style={s.infoSm}>{billing!.notes}</Text>}
+              </View>
+            </>
           ) : (
-            // keep 3-col balance even with no billing
-            <View style={s.infoCol} />
+            <>
+              <View style={s.infoDivider} />
+              <View style={s.infoCol} />
+            </>
           )}
         </View>
 
         {/* ── Schedule ── */}
         {activeDays.length > 0 && (
-          <View style={s.schedSec}>
-            <Text style={s.secLabel}>SCHEDULE</Text>
-            {multiColSched ? (
-              <View style={[s.schedDayRow]}>
-                {activeDays.map(date => {
+          <View style={s.schedWrap}>
+            <SecLabel text="SCHEDULE" />
+            {dayChunks.map((chunk, ci) => (
+              <View key={ci} style={[s.dayColumns, { marginBottom: 4 }]}>
+                {chunk.map(date => {
                   const items = schedByDate.get(date) ?? []
                   return (
-                    <View key={date} style={[s.dayBlock, { width: dayColWidth }]}>
-                      <Text style={s.dayHead}>{formatDate(date)}</Text>
+                    <View key={date} style={s.dayCol}>
+                      <Text style={s.dayHead}>{formatDate(date).toUpperCase()}</Text>
                       {items.map(item => (
-                        <Text key={item.id} style={s.schedItem}>
-                          {item.start_time
-                            ? <Text style={s.schedTime}>{formatTime(item.start_time)}{'  '}</Text>
-                            : null
-                          }
-                          {item.title}
-                          {item.location ? `  ·  ${item.location}` : ''}
-                        </Text>
+                        <View key={item.id} style={s.schedRow}>
+                          <Text style={s.schedTime}>
+                            {item.start_time ? formatTime(item.start_time) : ''}
+                          </Text>
+                          <Text style={s.schedTitle}>
+                            {item.title}
+                            {item.location ? `  ·  ${item.location}` : ''}
+                          </Text>
+                        </View>
                       ))}
                     </View>
                   )
                 })}
               </View>
-            ) : (
-              // vertical list for 1 day or 7+ days
-              activeDays.map(date => {
-                const items = schedByDate.get(date) ?? []
-                return (
-                  <View key={date} style={{ marginBottom: 4 }}>
-                    <Text style={s.dayHead}>{formatDate(date)}</Text>
-                    {items.map(item => (
-                      <Text key={item.id} style={s.schedItem}>
-                        {item.start_time
-                          ? <Text style={s.schedTime}>{formatTime(item.start_time)}{'  '}</Text>
-                          : null
-                        }
-                        {item.title}
-                        {item.location ? `  ·  ${item.location}` : ''}
-                      </Text>
-                    ))}
-                  </View>
-                )
-              })
-            )}
+            ))}
+            <Rule />
           </View>
         )}
 
         {/* ── Department coordination ── */}
-        {deptsWithAssignments.length > 0 && (
-          <View style={s.deptSec}>
-            <Text style={s.secLabel}>DEPARTMENT COORDINATION</Text>
-            <View style={s.deptGrid}>
-              {deptsWithAssignments.map(dept => {
-                const items = assignsByDept.get(dept.id) ?? []
-                const untimed = items.filter(a => !a.task_time)
-                const timed = items.filter(a => a.task_time).sort((a, b) =>
-                  (a.task_time! > b.task_time! ? 1 : -1)
-                )
-                return (
-                  <View key={dept.id} style={s.deptBlock} wrap={false}>
-                    <Text style={s.deptHead}>{dept.name.toUpperCase()}</Text>
-                    {untimed.map(a => (
-                      <View key={a.id} style={s.deptTaskRow}>
-                        <Text style={s.deptTaskTime}>General</Text>
-                        <Text style={s.deptTaskText}>{a.task}</Text>
-                      </View>
-                    ))}
-                    {timed.map(a => (
-                      <View key={a.id} style={s.deptTaskRow}>
-                        <Text style={s.deptTaskTime}>{taskTimeLabel(a.task_time, a.time_type)}</Text>
-                        <Text style={s.deptTaskText}>{a.task}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )
-              })}
-            </View>
+        {deptsWithWork.length > 0 && (
+          <View style={s.deptWrap}>
+            <SecLabel text="DEPARTMENT COORDINATION" />
+            {Array.from({ length: Math.ceil(deptsWithWork.length / 2) }, (_, i) => {
+              const left = deptsWithWork[i * 2]
+              const right = deptsWithWork[i * 2 + 1]
+              return (
+                <View key={i} style={s.deptRow} wrap={false}>
+                  <DeptBlock dept={left} assignments={assignsByDept.get(left.id) ?? []} />
+                  {right
+                    ? <DeptBlock dept={right} assignments={assignsByDept.get(right.id) ?? []} />
+                    : <View style={s.deptBlock} />
+                  }
+                </View>
+              )
+            })}
           </View>
         )}
 
         {/* ── Special notes ── */}
         {event.special_notes && (
-          <View style={s.notesSec}>
-            <Text style={s.secLabel}>SPECIAL NOTES</Text>
+          <View style={s.notesWrap}>
+            <SecLabel text="SPECIAL NOTES" />
             <Text style={s.notesText}>{event.special_notes}</Text>
           </View>
         )}
