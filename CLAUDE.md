@@ -163,7 +163,6 @@ Goal: **less paper**. Compact, efficient layouts. Small but readable type (9–1
 ## LATER — do NOT build until asked
 - Email via Resend: send each department its PDF, preview before sending, send log with delivery status, "Send Updated Assignments" (only to departments whose tasks changed, marked REVISED). Never auto-send on edit.
 - Viewer "mark done" on assignments.
-- Calendar tab: month/week view of all events.
 - Reminders, reusable task templates.
 
 ## How to work

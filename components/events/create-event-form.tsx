@@ -8,15 +8,16 @@ import { todayInPhoenix } from '@/lib/time'
 import type { EventType } from '@/lib/types'
 import TimePicker from '@/components/ui/time-picker'
 
-export default function CreateEventForm() {
+export default function CreateEventForm({ initialDate }: { initialDate?: string }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const today = todayInPhoenix()
+  const defaultDate = initialDate ?? today
 
   const [name, setName] = useState('')
   const [eventType, setEventType] = useState<EventType | ''>('')
-  const [startDate, setStartDate] = useState(today)
-  const [endDate, setEndDate] = useState(today)
+  const [startDate, setStartDate] = useState(defaultDate)
+  const [endDate, setEndDate] = useState(defaultDate)
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [pax, setPax] = useState('')
