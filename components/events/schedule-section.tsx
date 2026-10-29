@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Event, ScheduleItem } from '@/lib/types'
 import { createScheduleItem, updateScheduleItem, deleteScheduleItem } from '@/app/actions/schedule-items'
-import { formatDate, formatTime } from '@/lib/time'
+import { formatDateWithDay, formatTime } from '@/lib/time'
 import { getDayCount, shiftDate } from '@/lib/events'
 import TimePicker from '@/components/ui/time-picker'
 
@@ -247,7 +247,7 @@ export default function ScheduleSection({
             if (dayItems.length === 0) return null
             return (
               <div key={date}>
-                <p className="text-xs font-semibold text-brown-500 mb-1">{formatDate(date)}</p>
+                <p className="text-xs font-semibold text-brown-500 mb-1">{formatDateWithDay(date)}</p>
                 <div className="divide-y divide-cream-100">
                   {dayItems.map(item => (
                     <ItemRow key={item.id} item={item} eventId={event.id} canEdit={canEdit} />

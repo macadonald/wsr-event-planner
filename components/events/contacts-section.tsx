@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Event } from '@/lib/types'
 import { updateEvent } from '@/app/actions/events'
+import { formatPhone } from '@/lib/time'
 
 export default function ContactsSection({ event, canEdit }: { event: Event; canEdit: boolean }) {
   const router = useRouter()
@@ -71,7 +72,7 @@ export default function ContactsSection({ event, canEdit }: { event: Event; canE
               <label className="block text-xs font-medium text-brown-400 mb-1">Contact Phone</label>
               <input
                 value={contactPhone}
-                onChange={e => setContactPhone(e.target.value)}
+                onChange={e => setContactPhone(formatPhone(e.target.value))}
                 className="w-full border border-cream-300 rounded-lg px-3 py-2 text-sm bg-cream-50 focus:outline-none focus:ring-2 focus:ring-brown-300"
               />
             </div>

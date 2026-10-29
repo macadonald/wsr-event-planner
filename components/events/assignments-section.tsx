@@ -3,9 +3,10 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Assignment, Department, Event, TimeType } from '@/lib/types'
-import { createAssignment, updateAssignment, deleteAssignment } from '@/app/actions/assignments'
+import { createAssignments, updateAssignment, deleteAssignment, deleteAssignmentGroup } from '@/app/actions/assignments'
 import type { AssignmentFormData } from '@/app/actions/assignments'
-import { formatDate, formatTime } from '@/lib/time'
+import { formatDateWithDay, formatDateShortWithDay, formatTime } from '@/lib/time'
+import { getDayCount, shiftDate } from '@/lib/events'
 import TimePicker from '@/components/ui/time-picker'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -48,9 +49,10 @@ type RowProps = {
   departments: Department[]
   canEdit: boolean
   eventId: string
+  groupSize: number   // how many siblings share the same repeat_group_id
 }
 
-function AssignmentRow({ assignment, department, departments, canEdit, eventId }: RowProps) {
+function AssignmentRow({ assignment, department, departments, canEdit, eventId, groupSize }: RowProps) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [editing, setEditing] = useState(false)
@@ -83,7 +85,18 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId }
   }
 
   async function handleDelete() {
-    if (!confirm('Remove this assignment?')) return
+    if (assignment.repeat_group_id && groupSize > 1) {
+      const choice = confirm(
+        `This task repeats across ${groupSize} days.\n\nClick OK to delete all ${groupSize} days, or Cancel to delete this day only.`
+      )
+      if (choice) {
+        await deleteAssignmentGroup(assignment.repeat_group_id, eventId)
+        startTransition(() => router.refresh())
+        return
+      }
+    } else {
+      if (!confirm('Remove this assignment?')) return
+    }
     await deleteAssignment(assignment.id, eventId)
     startTransition(() => router.refresh())
   }
@@ -177,6 +190,9 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId }
             {assignment.notes}
           </p>
         )}
+        {assignment.repeat_group_id && groupSize > 1 && (
+          <p className="text-xs text-brown-300 mt-0.5">↻ {groupSize}-day group</p>
+        )}
       </div>
       {canEdit && (
         <div className="flex gap-1 shrink-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:transition-opacity">
@@ -216,6 +232,17 @@ export default function AssignmentsSection({ event, assignments, departments, ca
   const [groupBy, setGroupBy] = useState<'department' | 'date'>('department')
   const [filterDeptId, setFilterDeptId] = useState<string | null>(null)
 
+  // Day chips for multi-day events
+  const dayCount = getDayCount(event.start_date, event.end_date)
+  const eventDays: string[] = Array.from({ length: dayCount }, (_, i) => shiftDate(event.start_date, i))
+  const [selectedDates, setSelectedDates] = useState<string[]>([event.start_date])
+
+  function toggleDate(date: string) {
+    setSelectedDates(prev =>
+      prev.includes(date) ? (prev.length > 1 ? prev.filter(d => d !== date) : prev) : [...prev, date]
+    )
+  }
+
   function setAdd<K extends keyof AssignmentFormData>(k: K, v: AssignmentFormData[K]) {
     setAddForm(f => ({ ...f, [k]: v }))
   }
@@ -223,7 +250,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
   async function handleAdd() {
     if (!addForm.task.trim() || !addForm.department_id) return
     setSaving(true)
-    await createAssignment(event.id, {
+    await createAssignments(event.id, selectedDates, {
       ...addForm,
       task: addForm.task.trim(),
       notes: addForm.notes?.trim() || null,
@@ -231,12 +258,19 @@ export default function AssignmentsSection({ event, assignments, departments, ca
     })
     setSaving(false)
     setAddForm(blankForm(event.start_date))
+    setSelectedDates([event.start_date])
     setAdding(false)
     startTransition(() => router.refresh())
   }
 
   // dept lookup map
   const deptMap = new Map(departments.map(d => [d.id, d]))
+
+  // repeat group size map: groupId → count
+  const groupSizes = new Map<string, number>()
+  for (const a of assignments) {
+    if (a.repeat_group_id) groupSizes.set(a.repeat_group_id, (groupSizes.get(a.repeat_group_id) ?? 0) + 1)
+  }
 
   // apply department filter
   const visible = filterDeptId ? assignments.filter(a => a.department_id === filterDeptId) : assignments
@@ -253,7 +287,6 @@ export default function AssignmentsSection({ event, assignments, departments, ca
       grouped.get(a.department_id)!.push(a)
     }
 
-    // Sort departments by their sort_order
     const deptOrder = departments.map(d => d.id)
     const entries = Array.from(grouped.entries()).sort(
       (a, b) => deptOrder.indexOf(a[0]) - deptOrder.indexOf(b[0])
@@ -275,7 +308,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
               <>
                 <p className="text-xs text-brown-300 mt-1 mb-0.5">General</p>
                 {untimed.map(a => (
-                  <AssignmentRow key={a.id} assignment={a} department={dept} departments={departments} canEdit={canEdit} eventId={event.id} />
+                  <AssignmentRow key={a.id} assignment={a} department={dept} departments={departments} canEdit={canEdit} eventId={event.id} groupSize={a.repeat_group_id ? (groupSizes.get(a.repeat_group_id) ?? 1) : 1} />
                 ))}
               </>
             )}
@@ -284,7 +317,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
               return (
                 <div key={a.id}>
                   <p className="text-xs text-brown-300 mt-1 mb-0.5">{timeLabel}</p>
-                  <AssignmentRow assignment={a} department={dept} departments={departments} canEdit={canEdit} eventId={event.id} />
+                  <AssignmentRow assignment={a} department={dept} departments={departments} canEdit={canEdit} eventId={event.id} groupSize={a.repeat_group_id ? (groupSizes.get(a.repeat_group_id) ?? 1) : 1} />
                 </div>
               )
             })}
@@ -311,13 +344,13 @@ export default function AssignmentsSection({ event, assignments, departments, ca
 
       return (
         <div key={date} className="space-y-1">
-          <p className="text-xs font-semibold text-brown-500">{formatDate(date)}</p>
+          <p className="text-xs font-semibold text-brown-500">{formatDateWithDay(date)}</p>
           <div className="pl-2 space-y-0.5">
             {untimed.length > 0 && (
               <>
                 <p className="text-xs text-brown-300 mt-0.5 mb-0.5">General</p>
                 {untimed.map(a => (
-                  <AssignmentRow key={a.id} assignment={a} department={deptMap.get(a.department_id)} departments={departments} canEdit={canEdit} eventId={event.id} />
+                  <AssignmentRow key={a.id} assignment={a} department={deptMap.get(a.department_id)} departments={departments} canEdit={canEdit} eventId={event.id} groupSize={a.repeat_group_id ? (groupSizes.get(a.repeat_group_id) ?? 1) : 1} />
                 ))}
               </>
             )}
@@ -326,7 +359,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
               return (
                 <div key={a.id}>
                   <p className="text-xs text-brown-300 mt-1 mb-0.5">{timeLabel}</p>
-                  <AssignmentRow assignment={a} department={deptMap.get(a.department_id)} departments={departments} canEdit={canEdit} eventId={event.id} />
+                  <AssignmentRow assignment={a} department={deptMap.get(a.department_id)} departments={departments} canEdit={canEdit} eventId={event.id} groupSize={a.repeat_group_id ? (groupSizes.get(a.repeat_group_id) ?? 1) : 1} />
                 </div>
               )
             })}
@@ -342,7 +375,6 @@ export default function AssignmentsSection({ event, assignments, departments, ca
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <p className="text-xs font-semibold text-brown-400 uppercase tracking-wider">Assignments</p>
         <div className="flex items-center gap-2">
-          {/* Group by toggle */}
           <div className="flex rounded border border-cream-300 overflow-hidden text-xs">
             {(['department', 'date'] as const).map(g => (
               <button
@@ -401,20 +433,49 @@ export default function AssignmentsSection({ event, assignments, departments, ca
       {/* Add form */}
       {adding && (
         <div className="border border-cream-200 rounded-lg p-3 space-y-2 bg-cream-50 mb-4">
-          <div className="grid grid-cols-2 gap-2">
+
+          {/* Day chips (multi-day events only) */}
+          {dayCount > 1 && (
             <div>
-              <label className="block text-xs text-brown-300 mb-0.5">Department <span className="text-red-400">*</span></label>
-              <select
-                value={addForm.department_id}
-                onChange={e => setAdd('department_id', e.target.value)}
-                className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300"
-              >
-                <option value="">— Select —</option>
-                {departments.filter(d => d.active).map(d => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
+              <label className="block text-xs text-brown-300 mb-1">Day(s)</label>
+              <div className="flex flex-wrap gap-1.5">
+                {eventDays.map(day => {
+                  const active = selectedDates.includes(day)
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => toggleDate(day)}
+                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                        active
+                          ? 'bg-brown-500 text-white border-brown-500'
+                          : 'border-cream-300 text-brown-600 hover:bg-cream-100'
+                      }`}
+                    >
+                      {formatDateShortWithDay(day)}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
+          )}
+
+          <div>
+            <label className="block text-xs text-brown-300 mb-0.5">Department <span className="text-red-400">*</span></label>
+            <select
+              value={addForm.department_id}
+              onChange={e => setAdd('department_id', e.target.value)}
+              className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300"
+            >
+              <option value="">— Select —</option>
+              {departments.filter(d => d.active).map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Single-day: show date input */}
+          {dayCount === 1 && (
             <div>
               <label className="block text-xs text-brown-300 mb-0.5">Date</label>
               <input
@@ -424,7 +485,8 @@ export default function AssignmentsSection({ event, assignments, departments, ca
                 className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300"
               />
             </div>
-          </div>
+          )}
+
           <div>
             <label className="block text-xs text-brown-300 mb-0.5">Task <span className="text-red-400">*</span></label>
             <input
@@ -460,10 +522,10 @@ export default function AssignmentsSection({ event, assignments, departments, ca
               disabled={saving || !addForm.task.trim() || !addForm.department_id}
               className="bg-brown-500 hover:bg-brown-600 text-white text-xs px-3 py-1 rounded disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Adding…' : 'Add'}
+              {saving ? 'Adding…' : `Add${selectedDates.length > 1 ? ` (${selectedDates.length} days)` : ''}`}
             </button>
             <button
-              onClick={() => { setAdding(false); setAddForm(blankForm(event.start_date)) }}
+              onClick={() => { setAdding(false); setAddForm(blankForm(event.start_date)); setSelectedDates([event.start_date]) }}
               className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1"
             >
               Cancel

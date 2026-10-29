@@ -94,8 +94,22 @@ export type Assignment = {
   task_time: string | null   // 'HH:MM'; null = untimed / shows under "General"
   time_type: TimeType        // 'at' = happens at that time; 'by' = must be done by that time
   notes: string | null
+  repeat_group_id: string | null
   completed_at: string | null
   completed_by: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type EventNote = {
+  id: string
+  event_id: string
+  content: string
+  note_date: string | null   // 'YYYY-MM-DD'
+  print_on_dept_sheets: boolean
+  sort_order: number
   created_by: string | null
   updated_by: string | null
   created_at: string
@@ -146,8 +160,14 @@ export type Database = {
       }
       assignments: {
         Row: Assignment
-        Insert: Omit<Assignment, 'id' | 'created_at' | 'updated_at' | 'time_type' | 'completed_at' | 'completed_by'> & { id?: string; created_at?: string; updated_at?: string; time_type?: TimeType; completed_at?: string | null; completed_by?: string | null }
+        Insert: Omit<Assignment, 'id' | 'created_at' | 'updated_at' | 'time_type' | 'completed_at' | 'completed_by' | 'repeat_group_id'> & { id?: string; created_at?: string; updated_at?: string; time_type?: TimeType; completed_at?: string | null; completed_by?: string | null; repeat_group_id?: string | null }
         Update: Partial<Omit<Assignment, 'id'>>
+        Relationships: []
+      }
+      event_notes: {
+        Row: EventNote
+        Insert: Omit<EventNote, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<Omit<EventNote, 'id'>>
         Relationships: []
       }
     }

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
-import type { Assignment, Department, Event, ScheduleItem } from '@/lib/types'
+import type { Assignment, Department, Event, EventNote, ScheduleItem } from '@/lib/types'
 import { formatDate, formatTime, formatTimestamp } from '@/lib/time'
 import { getDayCount, formatDateRange } from '@/lib/events'
 import { bandColor, tint, C, T, SP } from './shared'
@@ -94,10 +94,11 @@ type Props = {
   department: Department
   scheduleItems: ScheduleItem[]
   assignments: Assignment[]
+  notes: EventNote[]
   updatedByName: string | null
 }
 
-export function DepartmentSheetPDF({ event, department, scheduleItems, assignments, updatedByName }: Props) {
+export function DepartmentSheetPDF({ event, department, scheduleItems, assignments, notes, updatedByName }: Props) {
   const dayCount = getDayCount(event.start_date, event.end_date)
   const dateRange = formatDateRange(event.start_date, event.end_date)
   const band = bandColor(department.color)
@@ -255,11 +256,15 @@ export function DepartmentSheetPDF({ event, department, scheduleItems, assignmen
           })}
         </View>
 
-        {/* Special notes */}
-        {event.special_notes && (
+        {/* Notes marked for dept sheets */}
+        {notes.filter(n => n.print_on_dept_sheets).length > 0 && (
           <View style={s.notesWrap}>
-            <Text style={s.secLabel}>SPECIAL NOTES</Text>
-            <Text style={{ fontSize: T.body, color: C.body }}>{event.special_notes}</Text>
+            <Text style={s.secLabel}>NOTES</Text>
+            {notes.filter(n => n.print_on_dept_sheets).map((n, i) => (
+              <Text key={n.id} style={{ fontSize: T.body, color: C.body, marginTop: i > 0 ? 3 : 0 }}>
+                {n.content}
+              </Text>
+            ))}
           </View>
         )}
 

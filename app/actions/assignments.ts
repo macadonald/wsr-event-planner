@@ -42,6 +42,50 @@ export async function createAssignment(
   return { error: null }
 }
 
+// Creates one assignment per date in dates[]. If dates.length > 1, all rows share a repeat_group_id.
+export async function createAssignments(
+  eventId: string,
+  dates: string[],
+  data: AssignmentFormData,
+): Promise<{ error: string | null }> {
+  if (dates.length === 0) return { error: 'No dates provided' }
+  if (dates.length === 1) return createAssignment(eventId, { ...data, task_date: dates[0] })
+
+  const ctx = await guardPlanner()
+  if (!ctx) return { error: 'Unauthorized' }
+
+  const groupId = crypto.randomUUID()
+  const rows = dates.map(d => ({
+    event_id: eventId,
+    ...data,
+    task_date: d,
+    repeat_group_id: groupId,
+    created_by: ctx.userId,
+    updated_by: ctx.userId,
+  }))
+
+  const { error } = await ctx.supabase.from('assignments').insert(rows)
+  if (error) return { error: error.message }
+  revalidatePath(`/events/${eventId}`)
+  return { error: null }
+}
+
+export async function deleteAssignmentGroup(
+  repeatGroupId: string,
+  eventId: string,
+): Promise<{ error: string | null }> {
+  const ctx = await guardPlanner()
+  if (!ctx) return { error: 'Unauthorized' }
+
+  const { error } = await ctx.supabase
+    .from('assignments')
+    .delete()
+    .eq('repeat_group_id', repeatGroupId)
+  if (error) return { error: error.message }
+  revalidatePath(`/events/${eventId}`)
+  return { error: null }
+}
+
 export async function updateAssignment(
   id: string,
   eventId: string,

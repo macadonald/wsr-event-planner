@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createEvent } from '@/app/actions/events'
 import { EVENT_TYPES } from '@/lib/events'
-import { todayInPhoenix } from '@/lib/time'
+import { todayInPhoenix, formatPhone } from '@/lib/time'
 import type { EventType } from '@/lib/types'
 import TimePicker from '@/components/ui/time-picker'
 
@@ -27,7 +27,6 @@ export default function CreateEventForm({ initialDate }: { initialDate?: string 
   const [contactEmail, setContactEmail] = useState('')
   const [onsiteContact, setOnsiteContact] = useState('')
   const [description, setDescription] = useState('')
-  const [specialNotes, setSpecialNotes] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -51,7 +50,7 @@ export default function CreateEventForm({ initialDate }: { initialDate?: string 
       contact_email: contactEmail.trim() || null,
       onsite_contact: onsiteContact.trim() || null,
       description: description.trim() || null,
-      special_notes: specialNotes.trim() || null,
+      special_notes: null,
       status: 'planning',
     })
     setSaving(false)
@@ -179,9 +178,9 @@ export default function CreateEventForm({ initialDate }: { initialDate?: string 
             <label className="block text-xs font-medium text-brown-400 mb-1">Contact Phone</label>
             <input
               value={contactPhone}
-              onChange={e => setContactPhone(e.target.value)}
+              onChange={e => setContactPhone(formatPhone(e.target.value))}
               className="w-full border border-cream-300 rounded-lg px-3 py-2 text-sm bg-cream-50 focus:outline-none focus:ring-2 focus:ring-brown-300"
-              placeholder="(520) 555-1234"
+              placeholder="520-555-1234"
             />
           </div>
         </div>
@@ -207,18 +206,6 @@ export default function CreateEventForm({ initialDate }: { initialDate?: string 
             />
           </div>
         </div>
-      </div>
-
-      {/* Special notes */}
-      <div className="bg-white border border-cream-200 rounded-xl p-5 shadow-sm space-y-4">
-        <p className="text-xs font-semibold text-brown-400 uppercase tracking-wider">Special Notes</p>
-        <textarea
-          value={specialNotes}
-          onChange={e => setSpecialNotes(e.target.value)}
-          rows={3}
-          className="w-full border border-cream-300 rounded-lg px-3 py-2 text-sm bg-cream-50 focus:outline-none focus:ring-2 focus:ring-brown-300 resize-none"
-          placeholder="Dietary restrictions, VIPs, setup notes…"
-        />
       </div>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}

@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import EventDetailClient from '@/components/events/event-detail-client'
-import type { Event, EventBilling, ScheduleItem, Assignment, Department } from '@/lib/types'
+import type { Event, EventBilling, ScheduleItem, Assignment, Department, EventNote } from '@/lib/types'
 
 export default async function EventPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -21,12 +21,14 @@ export default async function EventPage({ params }: { params: { id: string } }) 
     { data: scheduleData },
     { data: assignmentData },
     { data: departmentData },
+    { data: notesData },
   ] = await Promise.all([
     supabase.from('events').select('*').eq('id', params.id).single(),
     supabase.from('event_billing').select('*').eq('event_id', params.id).maybeSingle(),
     supabase.from('schedule_items').select('*').eq('event_id', params.id).order('item_date').order('start_time'),
     supabase.from('assignments').select('*').eq('event_id', params.id).order('task_date').order('task_time'),
     supabase.from('departments').select('*').eq('active', true).order('sort_order'),
+    supabase.from('event_notes').select('*').eq('event_id', params.id).order('sort_order').order('created_at'),
   ])
 
   if (!eventData) notFound()
@@ -46,6 +48,7 @@ export default async function EventPage({ params }: { params: { id: string } }) 
   const scheduleItems = (scheduleData ?? []) as ScheduleItem[]
   const assignments = (assignmentData ?? []) as Assignment[]
   const departments = (departmentData ?? []) as Department[]
+  const notes = (notesData ?? []) as EventNote[]
 
   const canEdit = profile.role === 'admin' || profile.role === 'planner'
 
@@ -56,6 +59,7 @@ export default async function EventPage({ params }: { params: { id: string } }) 
       scheduleItems={scheduleItems}
       assignments={assignments}
       departments={departments}
+      notes={notes}
       updatedByName={updatedByName}
       canEdit={canEdit}
     />

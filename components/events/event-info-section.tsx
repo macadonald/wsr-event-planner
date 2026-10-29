@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Event, EventType } from '@/lib/types'
 import { updateEvent } from '@/app/actions/events'
-import { formatDate, formatTime } from '@/lib/time'
+import { formatDateWithDay, formatTime } from '@/lib/time'
 import { EVENT_TYPES } from '@/lib/events'
 import TimePicker from '@/components/ui/time-picker'
 
@@ -175,8 +175,8 @@ export default function EventInfoSection({ event, canEdit }: { event: Event; can
           <div className="col-span-2">
             <dt className="text-xs text-brown-300">Dates</dt>
             <dd className="text-brown-700 font-medium">
-              {formatDate(event.start_date)}
-              {event.start_date !== event.end_date && <> – {formatDate(event.end_date)}</>}
+              {formatDateWithDay(event.start_date)}
+              {event.start_date !== event.end_date && <> – {formatDateWithDay(event.end_date)}</>}
             </dd>
           </div>
           {(event.start_time || event.end_time) && (

@@ -41,6 +41,34 @@ export function formatTimestamp(ts: string): string {
   }).format(new Date(ts))
 }
 
+// 'YYYY-MM-DD' → 'Wed, Nov 4, 2026'
+export function formatDateWithDay(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)))
+}
+
+// 'YYYY-MM-DD' → 'Wed 11/4'
+export function formatDateShortWithDay(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  const d = new Date(Date.UTC(year, month - 1, day))
+  const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(d)
+  return `${wd} ${month}/${day}`
+}
+
+// Auto-format a phone number as the user types: '3035470848' → '303-547-0848'
+export function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 10)
+  if (digits.length <= 3) return digits
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+}
+
 // True if date ('YYYY-MM-DD') is strictly before today in Phoenix.
 export function isBeforeToday(date: string): boolean {
   return date < todayInPhoenix()

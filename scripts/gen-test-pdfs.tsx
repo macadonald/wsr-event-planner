@@ -82,7 +82,7 @@ const SCHEDULE: ScheduleItem[] = [
 // ── mock assignments ─────────────────────────────────────────────────────────
 let aid = 1
 function a(dept: Department, date: string, time: string | null, time_type: 'at' | 'by', task: string, notes?: string): Assignment {
-  return { id: `a${aid++}`, event_id: 'e1', department_id: dept.id, task, task_date: date, task_time: time, time_type, notes: notes ?? null, completed_at: null, completed_by: null, created_by: 'u1', updated_by: 'u1', created_at: '', updated_at: '' }
+  return { id: `a${aid++}`, event_id: 'e1', department_id: dept.id, task, task_date: date, task_time: time, time_type, notes: notes ?? null, repeat_group_id: null, completed_at: null, completed_by: null, created_by: 'u1', updated_by: 'u1', created_at: '', updated_at: '' }
 }
 
 const SETUP = DEPTS[0], KITCHEN = DEPTS[1], CORRAL = DEPTS[2], ACTIVITIES = DEPTS[3], HOUSEKEEPING = DEPTS[4], FRONTDESK = DEPTS[5]
@@ -142,6 +142,7 @@ async function main() {
     scheduleItems={SCHEDULE}
     assignments={ASSIGNMENTS}
     departments={DEPTS}
+    notes={[]}
     updatedByName="T Mac"
   />)
 
@@ -150,6 +151,7 @@ async function main() {
     department={KITCHEN}
     scheduleItems={SCHEDULE}
     assignments={ASSIGNMENTS}
+    notes={[]}
     updatedByName="T Mac"
   />)
 

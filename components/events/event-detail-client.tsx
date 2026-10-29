@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Event, EventBilling, ScheduleItem, Assignment, Department } from '@/lib/types'
+import type { Event, EventBilling, ScheduleItem, Assignment, Department, EventNote } from '@/lib/types'
 import { formatTimestamp } from '@/lib/time'
 import { getDisplayStatus, getDayCount, STATUS_COLORS, STATUS_LABELS, EVENT_TYPE_COLORS } from '@/lib/events'
 import { setEventStatus, deleteEvent } from '@/app/actions/events'
@@ -12,6 +12,7 @@ import ContactsSection from './contacts-section'
 import BillingSection from './billing-section'
 import ScheduleSection from './schedule-section'
 import AssignmentsSection from './assignments-section'
+import NotesSection from './notes-section'
 import DuplicateModal from './duplicate-modal'
 
 type Props = {
@@ -20,11 +21,12 @@ type Props = {
   scheduleItems: ScheduleItem[]
   assignments: Assignment[]
   departments: Department[]
+  notes: EventNote[]
   updatedByName: string | null
   canEdit: boolean
 }
 
-export default function EventDetailClient({ event, billing, scheduleItems, assignments, departments, updatedByName, canEdit }: Props) {
+export default function EventDetailClient({ event, billing, scheduleItems, assignments, departments, notes, updatedByName, canEdit }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [showDuplicate, setShowDuplicate] = useState(false)
@@ -165,6 +167,7 @@ export default function EventDetailClient({ event, billing, scheduleItems, assig
       {canEdit && <BillingSection eventId={event.id} billing={billing} />}
       <ScheduleSection event={event} items={scheduleItems} canEdit={canEdit} />
       <AssignmentsSection event={event} assignments={assignments} departments={departments} canEdit={canEdit} />
+      <NotesSection eventId={event.id} notes={notes} canEdit={canEdit} />
 
       {showDuplicate && (
         <DuplicateModal

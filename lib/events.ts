@@ -1,4 +1,4 @@
-import { isBeforeToday, formatDate } from './time'
+import { isBeforeToday, formatDate, formatDateWithDay } from './time'
 import type { Event, EventStatus, EventType } from './types'
 
 export type DisplayStatus = 'completed' | EventStatus
@@ -28,6 +28,21 @@ export function formatDateRange(startDate: string, endDate: string): string {
     return `${start}–${end}`
   }
   return `${formatDate(startDate)}–${formatDate(endDate)}`
+}
+
+// "Wed, Nov 4, 2026" or "Wed, Nov 4 – Fri, Nov 6, 2026" (for UI, not PDFs)
+export function formatDateRangeWithDay(startDate: string, endDate: string): string {
+  if (startDate === endDate) return formatDateWithDay(startDate)
+  const [sy, sm, sd] = startDate.split('-').map(Number)
+  const [ey, em, ed] = endDate.split('-').map(Number)
+  if (sy === ey) {
+    const start = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(sy, sm - 1, sd)))
+    const end = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(ey, em - 1, ed)))
+    return `${start} – ${end}`
+  }
+  return `${formatDateWithDay(startDate)} – ${formatDateWithDay(endDate)}`
 }
 
 // Day offset between two date strings (can be negative).

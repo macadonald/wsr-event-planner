@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import type { Event } from '@/lib/types'
-import { getDisplayStatus, formatDateRange, EVENT_TYPE_COLORS, STATUS_COLORS, STATUS_LABELS } from '@/lib/events'
+import { getDisplayStatus, formatDateRangeWithDay, EVENT_TYPE_COLORS, STATUS_COLORS, STATUS_LABELS } from '@/lib/events'
 
 function EventCard({ event }: { event: Event }) {
   const status = getDisplayStatus(event)
@@ -15,7 +15,7 @@ function EventCard({ event }: { event: Event }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-semibold text-brown-800 truncate">{event.name}</h3>
-          <p className="text-sm text-brown-400 mt-0.5">{formatDateRange(event.start_date, event.end_date)}</p>
+          <p className="text-sm text-brown-400 mt-0.5">{formatDateRangeWithDay(event.start_date, event.end_date)}</p>
           {event.location && (
             <p className="text-xs text-brown-300 mt-0.5 truncate">{event.location}</p>
           )}

@@ -26,6 +26,10 @@ export async function GET(request: NextRequest) {
       }
     )
 
+    // Sign out any existing session before accepting the invite token,
+    // so a logged-in admin can't accidentally claim another user's invite.
+    await supabase.auth.signOut()
+
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`)

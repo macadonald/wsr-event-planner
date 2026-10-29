@@ -1,6 +1,6 @@
 import React from 'react'
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
-import type { Assignment, Department, Event, EventBilling, ScheduleItem } from '@/lib/types'
+import type { Assignment, Department, Event, EventBilling, EventNote, ScheduleItem } from '@/lib/types'
 import { formatDate, formatTime, formatTimestamp } from '@/lib/time'
 import { getDayCount, formatDateRange, shiftDate } from '@/lib/events'
 import { sortDeptsByPdfOrder, bandColor, tint, C, T, SP } from './shared'
@@ -156,10 +156,11 @@ type Props = {
   scheduleItems: ScheduleItem[]
   assignments: Assignment[]
   departments: Department[]
+  notes: EventNote[]
   updatedByName: string | null
 }
 
-export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, assignments, departments, updatedByName }: Props) {
+export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, assignments, departments, notes, updatedByName }: Props) {
   const dayCount = getDayCount(event.start_date, event.end_date)
   const dateRange = formatDateRange(event.start_date, event.end_date)
 
@@ -327,11 +328,15 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
           </View>
         )}
 
-        {/* ── Special notes ── */}
-        {event.special_notes && (
+        {/* ── Notes ── */}
+        {notes.length > 0 && (
           <View style={s.notesWrap}>
-            <SecLabel text="SPECIAL NOTES" />
-            <Text style={s.notesText}>{event.special_notes}</Text>
+            <SecLabel text="NOTES" />
+            {notes.map((n, i) => (
+              <View key={n.id} style={i > 0 ? { marginTop: 4 } : {}}>
+                <Text style={s.notesText}>{n.content}</Text>
+              </View>
+            ))}
           </View>
         )}
 
