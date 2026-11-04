@@ -8,7 +8,7 @@ import { shiftDate } from '@/lib/events'
 function thisWeek(): { from: string; to: string } {
   const today = todayInPhoenix()
   const [y, m, d] = today.split('-').map(Number)
-  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay() // 0=Sun
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
   const mondayOffset = dow === 0 ? -6 : 1 - dow
   const sundayOffset = dow === 0 ? 0 : 7 - dow
   return { from: shiftDate(today, mondayOffset), to: shiftDate(today, sundayOffset) }
@@ -21,9 +21,12 @@ function nextWeek(): { from: string; to: string } {
 
 export default function RunSheetForm({ departments }: { departments: Department[] }) {
   const week = thisWeek()
-  const [deptId, setDeptId] = useState('all')
+  const [selectedDeptIds, setSelectedDeptIds] = useState<Set<string>>(
+    () => new Set(departments.map(d => d.id))
+  )
   const [fromDate, setFromDate] = useState(week.from)
   const [toDate, setToDate] = useState(week.to)
+  const [runLayout, setRunLayout] = useState<'paged' | 'combined'>('paged')
   const [pdfStyle, setPdfStyle] = useState<'classic' | 'ledger'>('ledger')
 
   useEffect(() => {
@@ -36,13 +39,32 @@ export default function RunSheetForm({ departments }: { departments: Department[
     localStorage.setItem('wsr-pdf-style', s)
   }
 
-  function setWeek(range: { from: string; to: string }) {
-    setFromDate(range.from)
-    setToDate(range.to)
+  const allChecked = departments.every(d => selectedDeptIds.has(d.id))
+  const noneChecked = selectedDeptIds.size === 0
+  const multipleSelected = selectedDeptIds.size >= 2
+
+  function toggleSelectAll() {
+    if (allChecked) {
+      setSelectedDeptIds(new Set())
+    } else {
+      setSelectedDeptIds(new Set(departments.map(d => d.id)))
+    }
+  }
+
+  function toggleDept(id: string) {
+    const next = new Set(selectedDeptIds)
+    if (next.has(id)) {
+      next.delete(id)
+    } else {
+      next.add(id)
+    }
+    setSelectedDeptIds(next)
   }
 
   function generatePdf() {
-    const url = `/api/pdf/run-sheet?dept=${deptId}&from=${fromDate}&to=${toDate}&style=${pdfStyle}`
+    const depts = Array.from(selectedDeptIds).join(',')
+    const layout = multipleSelected ? runLayout : 'paged'
+    const url = `/api/pdf/run-sheet?depts=${depts}&from=${fromDate}&to=${toDate}&layout=${layout}&style=${pdfStyle}`
     window.open(url, '_blank')
   }
 
@@ -51,23 +73,69 @@ export default function RunSheetForm({ departments }: { departments: Department[
   return (
     <div className="bg-white border border-cream-200 rounded-xl p-6 shadow-sm space-y-5">
 
+      {/* Departments */}
       <div>
-        <label className="block text-xs font-medium text-brown-400 mb-1">Department</label>
-        <select value={deptId} onChange={e => setDeptId(e.target.value)} className={inputClass}>
-          <option value="all">All Departments (one page each)</option>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-xs font-medium text-brown-400">Departments</label>
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="text-xs text-brown-400 hover:text-brown-600 transition-colors"
+          >
+            {allChecked ? 'Deselect all' : 'Select all'}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-y-1.5 gap-x-4">
           {departments.map(d => (
-            <option key={d.id} value={d.id}>{d.name}</option>
+            <label key={d.id} className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={selectedDeptIds.has(d.id)}
+                onChange={() => toggleDept(d.id)}
+                className="rounded border-cream-300 text-brown-500 focus:ring-brown-300 flex-shrink-0"
+              />
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: d.color }}
+              />
+              <span className="text-sm text-brown-700 truncate">{d.name}</span>
+            </label>
           ))}
-        </select>
+        </div>
+        {noneChecked && (
+          <p className="text-xs text-red-400 mt-1.5">Select at least one department.</p>
+        )}
       </div>
 
+      {/* Layout toggle — only shown when 2+ selected */}
+      {multipleSelected && (
+        <div>
+          <label className="block text-xs font-medium text-brown-400 mb-1.5">Layout</label>
+          <div className="flex rounded border border-cream-300 overflow-hidden text-xs w-fit">
+            {(['paged', 'combined'] as const).map(opt => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setRunLayout(opt)}
+                className={`px-3 py-1.5 transition-colors ${
+                  runLayout === opt ? 'bg-brown-500 text-white' : 'bg-white text-brown-500 hover:bg-cream-50'
+                }`}
+              >
+                {opt === 'paged' ? 'One per page' : 'Combined'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Date range */}
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className="text-xs font-medium text-brown-400">Date Range</label>
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setWeek(thisWeek())}
+              onClick={() => { const w = thisWeek(); setFromDate(w.from); setToDate(w.to) }}
               className="text-xs text-brown-400 hover:text-brown-600 transition-colors"
             >
               This week
@@ -75,7 +143,7 @@ export default function RunSheetForm({ departments }: { departments: Department[
             <span className="text-xs text-brown-200">·</span>
             <button
               type="button"
-              onClick={() => setWeek(nextWeek())}
+              onClick={() => { const w = nextWeek(); setFromDate(w.from); setToDate(w.to) }}
               className="text-xs text-brown-400 hover:text-brown-600 transition-colors"
             >
               Next week
@@ -105,6 +173,7 @@ export default function RunSheetForm({ departments }: { departments: Department[
         </div>
       </div>
 
+      {/* Style selector + Print button */}
       <div className="flex items-center justify-between">
         <div className="flex rounded border border-cream-300 overflow-hidden text-xs">
           {(['ledger', 'classic'] as const).map(opt => (
@@ -123,9 +192,10 @@ export default function RunSheetForm({ departments }: { departments: Department[
 
         <button
           onClick={generatePdf}
-          className="bg-brown-500 hover:bg-brown-600 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+          disabled={noneChecked}
+          className="bg-brown-500 hover:bg-brown-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
         >
-          Generate PDF →
+          Print →
         </button>
       </div>
 

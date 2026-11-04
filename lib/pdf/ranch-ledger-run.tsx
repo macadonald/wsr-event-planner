@@ -148,17 +148,111 @@ function RLDeptPage({ department, assignments, fromDate, toDate }: {
   )
 }
 
+function RLCombinedDeptSection({ dept, assignments }: { dept: Department; assignments: RunSheetAssignment[] }) {
+  const band = bandColor(dept.color)
+  const byDate = new Map<string, RunSheetAssignment[]>()
+  for (const a of assignments) {
+    if (!byDate.has(a.task_date)) byDate.set(a.task_date, [])
+    byDate.get(a.task_date)!.push(a)
+  }
+  const dates = Array.from(byDate.keys()).sort()
+
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <View style={{ backgroundColor: band, paddingHorizontal: 8, paddingVertical: 5, marginBottom: 4 }}>
+        <Text style={{ fontFamily: 'SourceSerif4', fontWeight: 700, fontSize: BODY, color: RL.white }}>
+          {dept.name.toUpperCase()}
+        </Text>
+      </View>
+      {dates.length === 0 ? (
+        <Text style={s.empty}>No assignments in this date range.</Text>
+      ) : (
+        dates.map(date => {
+          const items = byDate.get(date)!
+          const untimed = items.filter(a => !a.task_time)
+          const timed = items.filter(a => a.task_time).sort((a, b) => (a.task_time! > b.task_time! ? 1 : -1))
+          return (
+            <View key={date}>
+              <Text style={[s.dayHead, { paddingLeft: 4 }]}>{rlColHead(date)}</Text>
+              {[...untimed, ...timed].map(a => (
+                <View key={a.id} style={s.taskRow}>
+                  <View style={s.timeCol}>
+                    <Text style={s.timeDay}>{rlDateShort(a.task_date)}</Text>
+                    <Text style={s.timeLabel}>
+                      {a.task_time
+                        ? `${a.time_type === 'by' ? 'By' : 'At'} ${formatTime(a.task_time)}`
+                        : 'General'}
+                    </Text>
+                  </View>
+                  <View style={s.taskCol}>
+                    <Text style={s.taskText}>{a.task}</Text>
+                    <Text style={s.taskMeta}>
+                      {a.event_name}{a.event_location ? `  ·  ${a.event_location}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )
+        })
+      )}
+    </View>
+  )
+}
+
 type Props = {
   departments: Department[]
   assignmentsByDept: Map<string, RunSheetAssignment[]>
   fromDate: string
   toDate: string
+  layout?: 'paged' | 'combined'
 }
 
-export function RanchLedgerRunSheetPDF({ departments, assignmentsByDept, fromDate, toDate }: Props) {
+export function RanchLedgerRunSheetPDF({ departments, assignmentsByDept, fromDate, toDate, layout = 'paged' }: Props) {
+  const deptsWithWork = departments.filter(d => (assignmentsByDept.get(d.id)?.length ?? 0) > 0)
+
+  if (layout === 'combined' && deptsWithWork.length > 1) {
+    return (
+      <Document>
+        <Page size="LETTER" style={s.page}>
+          <View fixed style={s.footer}>
+            <Text style={s.footerText}>Department Run Sheet</Text>
+            <Text
+              style={s.footerText}
+              render={({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
+                `Page ${pageNumber} of ${totalPages}`
+              }
+            />
+          </View>
+          <View style={s.headerRow}>
+            <View style={s.headerLeft}>
+              <Text style={s.headerBrand}>WHITE STALLION RANCH · RUN SHEET</Text>
+              <Text style={s.sheetTitle}>All Departments</Text>
+            </View>
+            <View style={s.headerRight}>
+              <Text style={s.dateRange}>{dateRangeLabel(fromDate, toDate)}</Text>
+            </View>
+          </View>
+          <View style={s.headerRule} />
+          {deptsWithWork.length === 0 ? (
+            <Text style={s.empty}>No assignments found in this date range.</Text>
+          ) : (
+            deptsWithWork.map(dept => (
+              <RLCombinedDeptSection
+                key={dept.id}
+                dept={dept}
+                assignments={assignmentsByDept.get(dept.id) ?? []}
+              />
+            ))
+          )}
+        </Page>
+      </Document>
+    )
+  }
+
   return (
     <Document>
-      {departments.map(dept => (
+      {deptsWithWork.map(dept => (
         <RLDeptPage
           key={dept.id}
           department={dept}
@@ -167,6 +261,11 @@ export function RanchLedgerRunSheetPDF({ departments, assignmentsByDept, fromDat
           toDate={toDate}
         />
       ))}
+      {deptsWithWork.length === 0 && (
+        <Page size="LETTER" style={s.page}>
+          <Text style={s.empty}>No assignments found in this date range.</Text>
+        </Page>
+      )}
     </Document>
   )
 }

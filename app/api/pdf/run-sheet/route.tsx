@@ -19,12 +19,15 @@ export async function GET(req: Request) {
   if (!profile?.active) return new Response('Unauthorized', { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const deptParam = searchParams.get('dept') ?? 'all'
+  const deptsParam = searchParams.get('depts') ?? 'all'
   const fromDate = searchParams.get('from') ?? ''
   const toDate = searchParams.get('to') ?? ''
   const style = searchParams.get('style') === 'classic' ? 'classic' : 'ledger'
+  const layout = searchParams.get('layout') === 'combined' ? 'combined' : 'paged'
 
   if (!fromDate || !toDate) return new Response('Missing from/to params', { status: 400 })
+
+  const deptIds = deptsParam === 'all' ? null : deptsParam.split(',').filter(Boolean)
 
   type AssignmentWithEvent = Assignment & {
     events: { name: string; location: string | null; pax: number | null } | null
@@ -39,8 +42,8 @@ export async function GET(req: Request) {
     .order('task_date')
     .order('task_time')
 
-  if (deptParam !== 'all') {
-    query = query.eq('department_id', deptParam)
+  if (deptIds) {
+    query = query.in('department_id', deptIds)
   }
 
   const [{ data: rawAssignments }, { data: allDepts }] = await Promise.all([
@@ -49,9 +52,9 @@ export async function GET(req: Request) {
   ])
 
   const departments = sortDeptsByPdfOrder(
-    deptParam === 'all'
-      ? (allDepts ?? []) as Department[]
-      : ((allDepts ?? []) as Department[]).filter(d => d.id === deptParam)
+    deptIds
+      ? ((allDepts ?? []) as Department[]).filter(d => deptIds.includes(d.id))
+      : (allDepts ?? []) as Department[]
   )
 
   const assignments: RunSheetAssignment[] = ((rawAssignments ?? []) as unknown as AssignmentWithEvent[]).map(a => ({
@@ -67,7 +70,7 @@ export async function GET(req: Request) {
     assignmentsByDept.get(a.department_id)!.push(a)
   }
 
-  const sharedProps = { departments, assignmentsByDept, fromDate, toDate }
+  const sharedProps = { departments, assignmentsByDept, fromDate, toDate, layout: layout as 'paged' | 'combined' }
 
   type PdfArg = Parameters<typeof renderToBuffer>[0]
   const element = style === 'classic'
@@ -76,9 +79,9 @@ export async function GET(req: Request) {
 
   const buffer = await renderToBuffer(element as unknown as PdfArg)
 
-  const deptLabel = deptParam === 'all'
-    ? 'all-depts'
-    : (departments[0]?.name.toLowerCase().replace(/\s+/g, '-') ?? deptParam)
+  const deptLabel = deptIds && deptIds.length === 1
+    ? (departments[0]?.name.toLowerCase().replace(/\s+/g, '-') ?? deptIds[0])
+    : 'all-depts'
   const filename = `run-sheet-${deptLabel}-${fromDate}.pdf`
   return new Response(new Uint8Array(buffer), {
     headers: {
