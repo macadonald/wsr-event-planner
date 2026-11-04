@@ -73,3 +73,21 @@ export function formatPhone(raw: string): string {
 export function isBeforeToday(date: string): boolean {
   return date < todayInPhoenix()
 }
+
+// timestamptz → human-readable relative time: "just now", "5m ago", "2h ago", "3d ago", or date.
+export function relativeTime(ts: string): string {
+  const diffMs = Date.now() - new Date(ts).getTime()
+  const mins = Math.round(diffMs / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.round(hours / 24)
+  if (days < 14) return `${days}d ago`
+  return formatDate(ts.slice(0, 10))
+}
+
+// True if the timestamp falls within the last `hours` hours.
+export function isWithinHours(ts: string, hours: number): boolean {
+  return Date.now() - new Date(ts).getTime() < hours * 3_600_000
+}

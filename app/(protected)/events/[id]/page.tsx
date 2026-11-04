@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import EventDetailClient from '@/components/events/event-detail-client'
-import type { Event, EventBilling, ScheduleItem, Assignment, Department, EventNote } from '@/lib/types'
+import type { Event, EventBilling, ScheduleItem, Assignment, Department, EventNote, EventActivity } from '@/lib/types'
 
 export default async function EventPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -22,6 +22,9 @@ export default async function EventPage({ params }: { params: { id: string } }) 
     { data: assignmentData },
     { data: departmentData },
     { data: notesData },
+    { data: activityData },
+    { data: profilesData },
+    { data: settingData },
   ] = await Promise.all([
     supabase.from('events').select('*').eq('id', params.id).single(),
     supabase.from('event_billing').select('*').eq('event_id', params.id).maybeSingle(),
@@ -29,6 +32,9 @@ export default async function EventPage({ params }: { params: { id: string } }) 
     supabase.from('assignments').select('*').eq('event_id', params.id).order('task_date').order('task_time'),
     supabase.from('departments').select('*').eq('active', true).order('sort_order'),
     supabase.from('event_notes').select('*').eq('event_id', params.id).order('sort_order').order('created_at'),
+    supabase.from('event_activity').select('*').eq('event_id', params.id).order('created_at', { ascending: false }).limit(30),
+    supabase.from('profiles').select('id, full_name'),
+    supabase.from('app_settings').select('value').eq('key', 'recent_changes_hours').single(),
   ])
 
   if (!eventData) notFound()
@@ -36,12 +42,16 @@ export default async function EventPage({ params }: { params: { id: string } }) 
   let updatedByName: string | null = null
   if (eventData.updated_by) {
     const { data: updater } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', eventData.updated_by)
-      .single()
+      .from('profiles').select('full_name').eq('id', eventData.updated_by).single()
     updatedByName = updater?.full_name ?? null
   }
+
+  const profilesMap: Record<string, string | null> = {}
+  for (const p of (profilesData ?? [])) {
+    profilesMap[p.id] = p.full_name
+  }
+
+  const recentHours = parseInt(settingData?.value ?? '48', 10)
 
   const event = eventData as Event
   const billing = billingData as EventBilling | null
@@ -49,6 +59,7 @@ export default async function EventPage({ params }: { params: { id: string } }) 
   const assignments = (assignmentData ?? []) as Assignment[]
   const departments = (departmentData ?? []) as Department[]
   const notes = (notesData ?? []) as EventNote[]
+  const activity = (activityData ?? []) as EventActivity[]
 
   const canEdit = profile.role === 'admin' || profile.role === 'planner'
 
@@ -62,6 +73,9 @@ export default async function EventPage({ params }: { params: { id: string } }) 
       notes={notes}
       updatedByName={updatedByName}
       canEdit={canEdit}
+      profilesMap={profilesMap}
+      recentHours={recentHours}
+      activity={activity}
     />
   )
 }

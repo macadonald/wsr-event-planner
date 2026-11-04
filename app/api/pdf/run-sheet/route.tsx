@@ -30,12 +30,12 @@ export async function GET(req: Request) {
   const deptIds = deptsParam === 'all' ? null : deptsParam.split(',').filter(Boolean)
 
   type AssignmentWithEvent = Assignment & {
-    events: { name: string; location: string | null; pax: number | null } | null
+    events: { name: string; location: string | null; pax: number | null; start_date: string; end_date: string } | null
   }
 
   let query = supabase
     .from('assignments')
-    .select('*, events!inner(name, location, pax)')
+    .select('*, events!inner(name, location, pax, start_date, end_date)')
     .gte('task_date', fromDate)
     .lte('task_date', toDate)
     .order('department_id')
@@ -46,9 +46,10 @@ export async function GET(req: Request) {
     query = query.in('department_id', deptIds)
   }
 
-  const [{ data: rawAssignments }, { data: allDepts }] = await Promise.all([
+  const [{ data: rawAssignments }, { data: allDepts }, { data: settingData }] = await Promise.all([
     query,
     supabase.from('departments').select('*').order('sort_order'),
+    supabase.from('app_settings').select('value').eq('key', 'recent_changes_hours').single(),
   ])
 
   const departments = sortDeptsByPdfOrder(
@@ -57,11 +58,14 @@ export async function GET(req: Request) {
       : (allDepts ?? []) as Department[]
   )
 
+  const recentHours = parseInt((settingData as { value: string } | null)?.value ?? '48', 10)
   const assignments: RunSheetAssignment[] = ((rawAssignments ?? []) as unknown as AssignmentWithEvent[]).map(a => ({
     ...a,
     event_name: a.events?.name ?? '',
     event_location: a.events?.location ?? null,
     event_pax: a.events?.pax ?? null,
+    event_start_date: a.events?.start_date ?? '',
+    event_end_date: a.events?.end_date ?? '',
   }))
 
   const assignmentsByDept = new Map<string, RunSheetAssignment[]>()
@@ -70,7 +74,7 @@ export async function GET(req: Request) {
     assignmentsByDept.get(a.department_id)!.push(a)
   }
 
-  const sharedProps = { departments, assignmentsByDept, fromDate, toDate, layout: layout as 'paged' | 'combined' }
+  const sharedProps = { departments, assignmentsByDept, fromDate, toDate, layout: layout as 'paged' | 'combined', recentHours }
 
   type PdfArg = Parameters<typeof renderToBuffer>[0]
   const element = style === 'classic'

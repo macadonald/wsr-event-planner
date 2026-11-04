@@ -1,7 +1,7 @@
 import React from 'react'
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { Assignment, Department, Event, EventNote, ScheduleItem } from '@/lib/types'
-import { formatTime, formatTimestamp } from '@/lib/time'
+import { formatTime, formatTimestamp, isWithinHours } from '@/lib/time'
 import { getDayCount, formatDateRange } from '@/lib/events'
 import { bandColor } from './shared'
 import { registerLedgerFonts } from './fonts'
@@ -85,7 +85,7 @@ const s = StyleSheet.create({
 
 // ── shared sub-components ─────────────────────────────────────────────────────
 
-function RLDeptCardFull({ dept, deptAssignments }: { dept: Department; deptAssignments: Assignment[] }) {
+function RLDeptCardFull({ dept, deptAssignments, event, recentHours }: { dept: Department; deptAssignments: Assignment[]; event: Event; recentHours: number }) {
   const band = bandColor(dept.color)
   const { collapsedRows, byDate, dates } = buildRLDeptRows(deptAssignments)
   const totalTasks = deptAssignments.length
@@ -118,22 +118,27 @@ function RLDeptCardFull({ dept, deptAssignments }: { dept: Department; deptAssig
         const items = byDate.get(date)!
         const untimed = items.filter(a => !a.task_time)
         const timed = items.filter(a => a.task_time).sort((a, b) => (a.task_time! > b.task_time! ? 1 : -1))
-        return [...untimed, ...timed].map(a => (
-          <View key={a.id} style={s.deptTaskRow}>
-            <View style={s.deptTaskLeft}>
-              <Text style={s.deptTaskDay}>{rlDateShort(a.task_date)}</Text>
-              <Text style={s.deptTaskTime}>
-                {a.task_time
-                  ? `${a.time_type === 'by' ? 'By' : 'At'} ${formatTime(a.task_time)}`
-                  : 'General'}
-              </Text>
+        const dateLabel = date < event.start_date ? 'Prep' : date > event.end_date ? 'Teardown' : null
+        return [...untimed, ...timed].map(a => {
+          const isUpd = recentHours > 0 && isWithinHours(a.updated_at, recentHours)
+          return (
+            <View key={a.id} style={s.deptTaskRow}>
+              <View style={s.deptTaskLeft}>
+                {dateLabel && <Text style={{ fontSize: NOTE - 1, color: '#B45309', lineHeight: 1.2 }}>{dateLabel}</Text>}
+                <Text style={s.deptTaskDay}>{rlDateShort(a.task_date)}</Text>
+                <Text style={s.deptTaskTime}>
+                  {a.task_time
+                    ? `${a.time_type === 'by' ? 'By' : 'At'} ${formatTime(a.task_time)}`
+                    : 'General'}
+                </Text>
+              </View>
+              <View style={s.deptTaskRight}>
+                <Text style={s.deptTaskText}>{a.task}{isUpd && <Text style={{ fontSize: NOTE, color: '#B45309', fontFamily: 'Inter', fontWeight: 700, paddingLeft: 4 }}>  UPDATED</Text>}</Text>
+                {a.notes && <Text style={s.deptTaskNote}>{a.notes}</Text>}
+              </View>
             </View>
-            <View style={s.deptTaskRight}>
-              <Text style={s.deptTaskText}>{a.task}</Text>
-              {a.notes && <Text style={s.deptTaskNote}>{a.notes}</Text>}
-            </View>
-          </View>
-        ))
+          )
+        })
       })}
 
       {collapsedRows.length === 0 && dates.length === 0 && (
@@ -245,9 +250,10 @@ type SingleProps = {
   assignments: Assignment[]
   notes: EventNote[]
   updatedByName: string | null
+  recentHours?: number
 }
 
-export function RanchLedgerDeptSheetPDF({ event, department, scheduleItems, assignments, notes, updatedByName }: SingleProps) {
+export function RanchLedgerDeptSheetPDF({ event, department, scheduleItems, assignments, notes, updatedByName, recentHours = 0 }: SingleProps) {
   const dayCount = getDayCount(event.start_date, event.end_date)
   const dateRange = formatDateRange(event.start_date, event.end_date)
   const deptAssignments = assignments.filter(a => a.department_id === department.id)
@@ -260,7 +266,7 @@ export function RanchLedgerDeptSheetPDF({ event, department, scheduleItems, assi
         <RLSummaryBar event={event} />
         <RLScheduleSection scheduleItems={scheduleItems} />
         <Text style={s.deptSectLabel}>TASKS</Text>
-        <RLDeptCardFull dept={department} deptAssignments={deptAssignments} />
+        <RLDeptCardFull dept={department} deptAssignments={deptAssignments} event={event} recentHours={recentHours} />
         {deptNotes.length > 0 && (
           <View style={s.notesBox}>
             <Text style={s.notesSectLabel}>NOTES</Text>
@@ -283,9 +289,10 @@ type MultiProps = {
   notes: EventNote[]
   updatedByName: string | null
   layout: 'paged' | 'combined'
+  recentHours?: number
 }
 
-export function RanchLedgerMultiDeptSheetPDF({ event, departments, assignments, scheduleItems, notes, updatedByName, layout }: MultiProps) {
+export function RanchLedgerMultiDeptSheetPDF({ event, departments, assignments, scheduleItems, notes, updatedByName, layout, recentHours = 0 }: MultiProps) {
   const dayCount = getDayCount(event.start_date, event.end_date)
   const dateRange = formatDateRange(event.start_date, event.end_date)
   const deptNotes = notes.filter(n => n.print_on_dept_sheets)
@@ -305,7 +312,7 @@ export function RanchLedgerMultiDeptSheetPDF({ event, departments, assignments, 
             <RLSummaryBar event={event} />
             <RLScheduleSection scheduleItems={scheduleItems} />
             <Text style={s.deptSectLabel}>TASKS</Text>
-            <RLDeptCardFull dept={dept} deptAssignments={assignsByDept.get(dept.id) ?? []} />
+            <RLDeptCardFull dept={dept} deptAssignments={assignsByDept.get(dept.id) ?? []} event={event} recentHours={recentHours} />
             {deptNotes.length > 0 && (
               <View style={s.notesBox}>
                 <Text style={s.notesSectLabel}>NOTES</Text>
@@ -352,7 +359,7 @@ export function RanchLedgerMultiDeptSheetPDF({ event, departments, assignments, 
 
         <Text style={s.deptSectLabel}>TASKS</Text>
         {departments.map(dept => (
-          <RLDeptCardFull key={dept.id} dept={dept} deptAssignments={assignsByDept.get(dept.id) ?? []} />
+          <RLDeptCardFull key={dept.id} dept={dept} deptAssignments={assignsByDept.get(dept.id) ?? []} event={event} recentHours={recentHours} />
         ))}
 
         {deptNotes.length > 0 && (

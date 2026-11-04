@@ -116,6 +116,24 @@ export type EventNote = {
   updated_at: string
 }
 
+export type EventActivity = {
+  id: string
+  event_id: string
+  actor_id: string | null
+  actor_name: string | null
+  action: 'added' | 'edited' | 'deleted'
+  entity_type: 'assignment' | 'schedule_item' | 'note' | 'event'
+  summary: string
+  created_at: string
+}
+
+export type AppSetting = {
+  key: string
+  value: string
+  updated_by: string | null
+  updated_at: string
+}
+
 // Convenience join types used by queries with nested selects
 export type DepartmentWithRecipients = Department & { department_recipients: DepartmentRecipient[] }
 
@@ -168,6 +186,18 @@ export type Database = {
         Row: EventNote
         Insert: Omit<EventNote, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
         Update: Partial<Omit<EventNote, 'id'>>
+        Relationships: []
+      }
+      event_activity: {
+        Row: EventActivity
+        Insert: Omit<EventActivity, 'id' | 'created_at'> & { id?: string; created_at?: string }
+        Update: Partial<Omit<EventActivity, 'id'>>
+        Relationships: []
+      }
+      app_settings: {
+        Row: AppSetting
+        Insert: Partial<AppSetting> & { key: string; value: string }
+        Update: Partial<AppSetting>
         Relationships: []
       }
     }

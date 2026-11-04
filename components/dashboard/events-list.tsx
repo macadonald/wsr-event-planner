@@ -4,9 +4,20 @@ import { useState } from 'react'
 import Link from 'next/link'
 import type { Event } from '@/lib/types'
 import { getDisplayStatus, formatDateRangeWithDay, EVENT_TYPE_COLORS, STATUS_COLORS, STATUS_LABELS } from '@/lib/events'
+import { relativeTime, formatTimestamp, isWithinHours } from '@/lib/time'
 
-function EventCard({ event }: { event: Event }) {
+function EventCard({
+  event,
+  updaterName,
+  recentHours,
+}: {
+  event: Event
+  updaterName: string | null
+  recentHours: number
+}) {
   const status = getDisplayStatus(event)
+  const isChanged = isWithinHours(event.updated_at, recentHours)
+
   return (
     <Link
       href={`/events/${event.id}`}
@@ -14,11 +25,21 @@ function EventCard({ event }: { event: Event }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-semibold text-brown-800 truncate">{event.name}</h3>
+          <div className="flex items-baseline gap-1.5">
+            <h3 className="font-semibold text-brown-800 truncate">{event.name}</h3>
+            {isChanged && (
+              <span className="inline-block text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full leading-none shrink-0">
+                Changed
+              </span>
+            )}
+          </div>
           <p className="text-sm text-brown-400 mt-0.5">{formatDateRangeWithDay(event.start_date, event.end_date)}</p>
           {event.location && (
             <p className="text-xs text-brown-300 mt-0.5 truncate">{event.location}</p>
           )}
+          <p className="text-xs text-brown-300 mt-0.5" title={formatTimestamp(event.updated_at)}>
+            Updated {relativeTime(event.updated_at)}{updaterName ? ` by ${updaterName}` : ''}
+          </p>
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           {event.event_type && (
@@ -41,9 +62,13 @@ function EventCard({ event }: { event: Event }) {
 export default function EventsList({
   upcoming,
   past,
+  profilesMap,
+  recentHours,
 }: {
   upcoming: Event[]
   past: Event[]
+  profilesMap: Record<string, string | null>
+  recentHours: number
 }) {
   const [search, setSearch] = useState('')
 
@@ -81,7 +106,14 @@ export default function EventsList({
         <section>
           <h2 className="text-xs font-semibold text-brown-400 uppercase tracking-wider mb-3">Upcoming</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredUpcoming.map(e => <EventCard key={e.id} event={e} />)}
+            {filteredUpcoming.map(e => (
+              <EventCard
+                key={e.id}
+                event={e}
+                updaterName={e.updated_by ? (profilesMap[e.updated_by] ?? null) : null}
+                recentHours={recentHours}
+              />
+            ))}
           </div>
         </section>
       )}
@@ -90,7 +122,14 @@ export default function EventsList({
         <section>
           <h2 className="text-xs font-semibold text-brown-400 uppercase tracking-wider mb-3">Past</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 opacity-70">
-            {filteredPast.map(e => <EventCard key={e.id} event={e} />)}
+            {filteredPast.map(e => (
+              <EventCard
+                key={e.id}
+                event={e}
+                updaterName={e.updated_by ? (profilesMap[e.updated_by] ?? null) : null}
+                recentHours={recentHours}
+              />
+            ))}
           </div>
         </section>
       )}

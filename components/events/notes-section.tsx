@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { EventNote } from '@/lib/types'
 import { createNote, updateNote, deleteNote } from '@/app/actions/event-notes'
 import type { NoteFormData } from '@/app/actions/event-notes'
-import { formatDateWithDay } from '@/lib/time'
+import { formatDateWithDay, relativeTime, formatTimestamp, isWithinHours } from '@/lib/time'
 
 function blankForm(): NoteFormData {
   return { content: '', note_date: null, print_on_dept_sheets: false }
@@ -15,10 +15,14 @@ function NoteRow({
   note,
   eventId,
   canEdit,
+  profilesMap,
+  recentHours,
 }: {
   note: EventNote
   eventId: string
   canEdit: boolean
+  profilesMap: Record<string, string | null>
+  recentHours: number
 }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -90,16 +94,29 @@ function NoteRow({
     )
   }
 
+  const updaterName = note.updated_by ? (profilesMap[note.updated_by] ?? null) : null
+  const isChanged = isWithinHours(note.updated_at, recentHours)
+
   return (
     <div className="flex items-start gap-2 py-2 group border-b border-cream-100 last:border-b-0">
       <div className="flex-1 min-w-0">
         {note.note_date && (
           <p className="text-xs text-brown-400 mb-0.5">{formatDateWithDay(note.note_date)}</p>
         )}
-        <p className="text-sm text-brown-700 whitespace-pre-wrap leading-snug">{note.content}</p>
+        <div className="flex items-baseline gap-1.5">
+          <p className="text-sm text-brown-700 whitespace-pre-wrap leading-snug">{note.content}</p>
+          {isChanged && (
+            <span className="inline-block text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full leading-none shrink-0">
+              Changed
+            </span>
+          )}
+        </div>
         {note.print_on_dept_sheets && (
           <p className="text-xs text-brown-400 mt-0.5">Prints on dept sheets</p>
         )}
+        <p className="text-xs text-brown-300 mt-0.5" title={formatTimestamp(note.updated_at)}>
+          Updated {relativeTime(note.updated_at)}{updaterName ? `  ·  ${updaterName}` : ''}
+        </p>
       </div>
       {canEdit && (
         <div className="flex gap-1 shrink-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:transition-opacity">
@@ -115,9 +132,11 @@ type Props = {
   eventId: string
   notes: EventNote[]
   canEdit: boolean
+  profilesMap: Record<string, string | null>
+  recentHours: number
 }
 
-export default function NotesSection({ eventId, notes, canEdit }: Props) {
+export default function NotesSection({ eventId, notes, canEdit, profilesMap, recentHours }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [adding, setAdding] = useState(false)
@@ -195,7 +214,7 @@ export default function NotesSection({ eventId, notes, canEdit }: Props) {
       ) : (
         <div>
           {notes.map(note => (
-            <NoteRow key={note.id} note={note} eventId={eventId} canEdit={canEdit} />
+            <NoteRow key={note.id} note={note} eventId={eventId} canEdit={canEdit} profilesMap={profilesMap} recentHours={recentHours} />
           ))}
         </div>
       )}

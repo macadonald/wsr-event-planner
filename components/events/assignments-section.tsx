@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import type { Assignment, Department, Event, TimeType } from '@/lib/types'
 import { createAssignments, updateAssignment, updateAssignmentGroup, deleteAssignment, deleteAssignmentGroup } from '@/app/actions/assignments'
 import type { AssignmentFormData } from '@/app/actions/assignments'
-import { formatDateWithDay, formatDateShortWithDay, formatTime } from '@/lib/time'
-import { getDayCount, shiftDate } from '@/lib/events'
+import { formatDateWithDay, formatDateShortWithDay, formatTime, relativeTime, formatTimestamp, isWithinHours } from '@/lib/time'
+import { getDayCount, shiftDate, assignmentDateLabel, assignmentDateRange } from '@/lib/events'
 import TimePicker from '@/components/ui/time-picker'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -18,6 +18,16 @@ function formatAssignmentTime(task_time: string | null, time_type: TimeType): st
 
 function blankForm(defaultDate: string): AssignmentFormData {
   return { department_id: '', task: '', task_date: defaultDate, task_time: null, time_type: 'at', notes: null }
+}
+
+function dateHeadLabel(date: string, event: Event): string {
+  const label = assignmentDateLabel(date, event)
+  return label ? `${label}  ·  ${formatDateShortWithDay(date)}` : formatDateShortWithDay(date)
+}
+
+function dateGroupLabel(date: string, event: Event): string {
+  const label = assignmentDateLabel(date, event)
+  return label ? `${label}  ·  ${formatDateWithDay(date)}` : formatDateWithDay(date)
 }
 
 // ── TimeType toggle ───────────────────────────────────────────────────────────
@@ -48,11 +58,13 @@ type RowProps = {
   department: Department | undefined
   departments: Department[]
   canEdit: boolean
-  eventId: string
-  siblingDates: string[]  // other dates in same repeat group (sorted)
+  event: Event
+  siblingDates: string[]
+  profilesMap: Record<string, string | null>
+  recentHours: number
 }
 
-function AssignmentRow({ assignment, department, departments, canEdit, eventId, siblingDates }: RowProps) {
+function AssignmentRow({ assignment, department, departments, canEdit, event, siblingDates, profilesMap, recentHours }: RowProps) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [editing, setEditing] = useState(false)
@@ -70,6 +82,7 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
 
   const isRepeat = !!(assignment.repeat_group_id && siblingDates.length > 0)
   const totalDays = siblingDates.length + 1
+  const { min: dateMin, max: dateMax } = assignmentDateRange(event)
 
   function setF<K extends keyof AssignmentFormData>(k: K, v: AssignmentFormData[K]) {
     setForm(f => ({ ...f, [k]: v }))
@@ -95,9 +108,9 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
     }
     if (scope === 'all' && assignment.repeat_group_id) {
       const { task, task_time, time_type, notes, department_id } = data
-      await updateAssignmentGroup(assignment.repeat_group_id, eventId, { task, task_time, time_type, notes, department_id })
+      await updateAssignmentGroup(assignment.repeat_group_id, event.id, { task, task_time, time_type, notes, department_id })
     } else {
-      await updateAssignment(assignment.id, eventId, data)
+      await updateAssignment(assignment.id, event.id, data)
     }
     setSaving(false)
     setEditing(false)
@@ -107,15 +120,17 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
   async function executeDelete(scope: 'single' | 'all') {
     setShowDeleteDialog(false)
     if (scope === 'all' && assignment.repeat_group_id) {
-      await deleteAssignmentGroup(assignment.repeat_group_id, eventId)
+      await deleteAssignmentGroup(assignment.repeat_group_id, event.id)
     } else {
-      await deleteAssignment(assignment.id, eventId)
+      await deleteAssignment(assignment.id, event.id)
     }
     startTransition(() => router.refresh())
   }
 
   const timeLabel = formatAssignmentTime(assignment.task_time, assignment.time_type)
   const deptColor = department?.color ?? '#888'
+  const updaterName = assignment.updated_by ? (profilesMap[assignment.updated_by] ?? null) : null
+  const isChanged = isWithinHours(assignment.updated_at, recentHours)
 
   if (editing) {
     return (
@@ -139,6 +154,8 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
             <input
               type="date"
               value={form.task_date}
+              min={dateMin}
+              max={dateMax}
               onChange={e => setF('task_date', e.target.value)}
               className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300"
             />
@@ -177,41 +194,28 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
             <p className="text-xs text-brown-600">This task repeats across {totalDays} days. Save changes to which?</p>
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => executeSave('single')}
-                disabled={saving}
-                className="text-xs bg-brown-500 hover:bg-brown-600 text-white px-3 py-1.5 rounded disabled:opacity-50 transition-colors"
-              >
+              <button onClick={() => executeSave('single')} disabled={saving}
+                className="text-xs bg-brown-500 hover:bg-brown-600 text-white px-3 py-1.5 rounded disabled:opacity-50 transition-colors">
                 This day only
               </button>
-              <button
-                onClick={() => executeSave('all')}
-                disabled={saving}
-                className="text-xs bg-brown-500 hover:bg-brown-600 text-white px-3 py-1.5 rounded disabled:opacity-50 transition-colors"
-              >
+              <button onClick={() => executeSave('all')} disabled={saving}
+                className="text-xs bg-brown-500 hover:bg-brown-600 text-white px-3 py-1.5 rounded disabled:opacity-50 transition-colors">
                 All {totalDays} days
               </button>
-              <button
-                onClick={() => setShowEditScopeDialog(false)}
-                className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1.5"
-              >
+              <button onClick={() => setShowEditScopeDialog(false)}
+                className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1.5">
                 Cancel
               </button>
             </div>
           </div>
         ) : (
           <div className="flex gap-2">
-            <button
-              onClick={handleSaveClick}
-              disabled={saving || !form.task.trim() || !form.department_id}
-              className="bg-brown-500 hover:bg-brown-600 text-white text-xs px-3 py-1 rounded disabled:opacity-50 transition-colors"
-            >
+            <button onClick={handleSaveClick} disabled={saving || !form.task.trim() || !form.department_id}
+              className="bg-brown-500 hover:bg-brown-600 text-white text-xs px-3 py-1 rounded disabled:opacity-50 transition-colors">
               {saving ? 'Saving…' : 'Save'}
             </button>
-            <button
-              onClick={() => setEditing(false)}
-              className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1"
-            >
+            <button onClick={() => setEditing(false)}
+              className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1">
               Cancel
             </button>
           </div>
@@ -225,11 +229,18 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
       <div className="flex items-start gap-2 py-1.5 group">
         <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: deptColor }} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-brown-700 leading-snug">{assignment.task}</p>
+          <div className="flex items-baseline gap-1.5">
+            <p className="text-sm text-brown-700 leading-snug">{assignment.task}</p>
+            {isChanged && (
+              <span className="inline-block text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full leading-none shrink-0">
+                Changed
+              </span>
+            )}
+          </div>
           {(timeLabel || assignment.notes) && (
             <p className="text-xs text-brown-400 mt-0.5">
               {timeLabel}
-              {timeLabel && assignment.notes ? ' · ' : ''}
+              {timeLabel && assignment.notes ? '  ·  ' : ''}
               {assignment.notes}
             </p>
           )}
@@ -238,21 +249,17 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
               ↻ also {siblingDates.map(d => formatDateShortWithDay(d)).join(', ')}
             </p>
           )}
+          <p className="text-xs text-brown-300 mt-0.5" title={formatTimestamp(assignment.updated_at)}>
+            Updated {relativeTime(assignment.updated_at)}{updaterName ? `  ·  ${updaterName}` : ''}
+          </p>
         </div>
         {canEdit && (
           <div className="flex gap-1 shrink-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:transition-opacity">
-            <button
-              onClick={() => setEditing(true)}
-              className="text-xs text-brown-400 hover:text-brown-600 px-1"
-            >
-              Edit
-            </button>
+            <button onClick={() => setEditing(true)} className="text-xs text-brown-400 hover:text-brown-600 px-1">Edit</button>
             <button
               onClick={() => isRepeat ? setShowDeleteDialog(true) : executeDelete('single')}
               className="text-xs text-red-400 hover:text-red-600 px-1"
-            >
-              ✕
-            </button>
+            >✕</button>
           </div>
         )}
       </div>
@@ -261,22 +268,16 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
         <div className="ml-3.5 bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
           <p className="text-xs text-red-700">This task repeats across {totalDays} days. Delete which?</p>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => executeDelete('single')}
-              className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition-colors"
-            >
+            <button onClick={() => executeDelete('single')}
+              className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition-colors">
               Delete this day only
             </button>
-            <button
-              onClick={() => executeDelete('all')}
-              className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition-colors"
-            >
+            <button onClick={() => executeDelete('all')}
+              className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition-colors">
               Delete all {totalDays} days
             </button>
-            <button
-              onClick={() => setShowDeleteDialog(false)}
-              className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1.5"
-            >
+            <button onClick={() => setShowDeleteDialog(false)}
+              className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1.5">
               Keep it
             </button>
           </div>
@@ -293,9 +294,11 @@ type Props = {
   assignments: Assignment[]
   departments: Department[]
   canEdit: boolean
+  profilesMap: Record<string, string | null>
+  recentHours: number
 }
 
-export default function AssignmentsSection({ event, assignments, departments, canEdit }: Props) {
+export default function AssignmentsSection({ event, assignments, departments, canEdit, profilesMap, recentHours }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [adding, setAdding] = useState(false)
@@ -303,16 +306,29 @@ export default function AssignmentsSection({ event, assignments, departments, ca
   const [addForm, setAddForm] = useState<AssignmentFormData>(blankForm(event.start_date))
   const [groupBy, setGroupBy] = useState<'department' | 'date'>('department')
   const [filterDeptId, setFilterDeptId] = useState<string | null>(null)
+  const [showPrepPicker, setShowPrepPicker] = useState(false)
+  const [prepPickerDate, setPrepPickerDate] = useState('')
 
-  // Day chips for multi-day events
+  // Day chips: event days
   const dayCount = getDayCount(event.start_date, event.end_date)
   const eventDays: string[] = Array.from({ length: dayCount }, (_, i) => shiftDate(event.start_date, i))
   const [selectedDates, setSelectedDates] = useState<string[]>([event.start_date])
+
+  const { min: dateMin, max: dateMax } = assignmentDateRange(event)
 
   function toggleDate(date: string) {
     setSelectedDates(prev =>
       prev.includes(date) ? (prev.length > 1 ? prev.filter(d => d !== date) : prev) : [...prev, date]
     )
+  }
+
+  function addPrepDate() {
+    if (!prepPickerDate) return
+    if (!selectedDates.includes(prepPickerDate)) {
+      setSelectedDates(prev => [...prev, prepPickerDate].sort())
+    }
+    setPrepPickerDate('')
+    setShowPrepPicker(false)
   }
 
   function setAdd<K extends keyof AssignmentFormData>(k: K, v: AssignmentFormData[K]) {
@@ -331,14 +347,15 @@ export default function AssignmentsSection({ event, assignments, departments, ca
     setSaving(false)
     setAddForm(blankForm(event.start_date))
     setSelectedDates([event.start_date])
+    setShowPrepPicker(false)
+    setPrepPickerDate('')
     setAdding(false)
     startTransition(() => router.refresh())
   }
 
-  // dept lookup map
   const deptMap = new Map(departments.map(d => [d.id, d]))
 
-  // Build sibling dates map: assignment.id → sorted list of other dates in same repeat group
+  // Build sibling dates map
   const groupDates = new Map<string, string[]>()
   for (const a of assignments) {
     if (a.repeat_group_id) {
@@ -354,12 +371,20 @@ export default function AssignmentsSection({ event, assignments, departments, ca
     }
   }
 
-  // apply department filter
   const visible = filterDeptId ? assignments.filter(a => a.department_id === filterDeptId) : assignments
-
-  // departments that actually have assignments (for filter chips)
   const usedDeptIds = Array.from(new Set(assignments.map(a => a.department_id)))
   const usedDepts = departments.filter(d => usedDeptIds.includes(d.id))
+
+  const rowProps = (a: Assignment) => ({
+    assignment: a,
+    department: deptMap.get(a.department_id),
+    departments,
+    canEdit,
+    event,
+    siblingDates: siblingDates.get(a.id) ?? [],
+    profilesMap,
+    recentHours,
+  })
 
   // ── group by department ──
   function renderByDepartment() {
@@ -368,7 +393,6 @@ export default function AssignmentsSection({ event, assignments, departments, ca
       if (!grouped.has(a.department_id)) grouped.set(a.department_id, [])
       grouped.get(a.department_id)!.push(a)
     }
-
     const deptOrder = departments.map(d => d.id)
     const entries = Array.from(grouped.entries()).sort(
       (a, b) => deptOrder.indexOf(a[0]) - deptOrder.indexOf(b[0])
@@ -376,8 +400,6 @@ export default function AssignmentsSection({ event, assignments, departments, ca
 
     return entries.map(([deptId, items]) => {
       const dept = deptMap.get(deptId)
-
-      // Group by date within dept
       const byDate = new Map<string, Assignment[]>()
       for (const a of items) {
         if (!byDate.has(a.task_date)) byDate.set(a.task_date, [])
@@ -398,18 +420,10 @@ export default function AssignmentsSection({ event, assignments, departments, ca
               const timed = dateItems.filter(a => a.task_time).sort((a, b) => (a.task_time! > b.task_time! ? 1 : -1))
               return (
                 <div key={date}>
-                  <p className="text-xs font-medium text-brown-400 mt-1 mb-0.5">{formatDateShortWithDay(date)}</p>
+                  <p className="text-xs font-medium text-brown-400 mt-1 mb-0.5">{dateHeadLabel(date, event)}</p>
                   <div className="space-y-0.5">
                     {[...untimed, ...timed].map(a => (
-                      <AssignmentRow
-                        key={a.id}
-                        assignment={a}
-                        department={dept}
-                        departments={departments}
-                        canEdit={canEdit}
-                        eventId={event.id}
-                        siblingDates={siblingDates.get(a.id) ?? []}
-                      />
+                      <AssignmentRow key={a.id} {...rowProps(a)} />
                     ))}
                   </div>
                 </div>
@@ -428,7 +442,6 @@ export default function AssignmentsSection({ event, assignments, departments, ca
       if (!grouped.has(a.task_date)) grouped.set(a.task_date, [])
       grouped.get(a.task_date)!.push(a)
     }
-
     const dates = Array.from(grouped.keys()).sort()
 
     return dates.map(date => {
@@ -438,22 +451,22 @@ export default function AssignmentsSection({ event, assignments, departments, ca
 
       return (
         <div key={date} className="space-y-1">
-          <p className="text-xs font-semibold text-brown-500">{formatDateWithDay(date)}</p>
+          <p className="text-xs font-semibold text-brown-500">{dateGroupLabel(date, event)}</p>
           <div className="pl-2 space-y-0.5">
             {untimed.length > 0 && (
               <>
                 <p className="text-xs text-brown-300 mt-0.5 mb-0.5">General</p>
                 {untimed.map(a => (
-                  <AssignmentRow key={a.id} assignment={a} department={deptMap.get(a.department_id)} departments={departments} canEdit={canEdit} eventId={event.id} siblingDates={siblingDates.get(a.id) ?? []} />
+                  <AssignmentRow key={a.id} {...rowProps(a)} />
                 ))}
               </>
             )}
             {timed.map(a => {
-              const timeLabel = formatAssignmentTime(a.task_time, a.time_type)!
+              const tl = formatAssignmentTime(a.task_time, a.time_type)!
               return (
                 <div key={a.id}>
-                  <p className="text-xs text-brown-300 mt-1 mb-0.5">{timeLabel}</p>
-                  <AssignmentRow assignment={a} department={deptMap.get(a.department_id)} departments={departments} canEdit={canEdit} eventId={event.id} siblingDates={siblingDates.get(a.id) ?? []} />
+                  <p className="text-xs text-brown-300 mt-1 mb-0.5">{tl}</p>
+                  <AssignmentRow {...rowProps(a)} />
                 </div>
               )
             })}
@@ -462,6 +475,9 @@ export default function AssignmentsSection({ event, assignments, departments, ca
       )
     })
   }
+
+  // Non-event-day dates currently selected
+  const prepDates = selectedDates.filter(d => !eventDays.includes(d))
 
   return (
     <div className="bg-white border border-cream-200 rounded-xl p-5 shadow-sm">
@@ -483,10 +499,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
             ))}
           </div>
           {canEdit && !adding && (
-            <button
-              onClick={() => setAdding(true)}
-              className="text-xs text-brown-400 hover:text-brown-600 transition-colors"
-            >
+            <button onClick={() => setAdding(true)} className="text-xs text-brown-400 hover:text-brown-600 transition-colors">
               + Add
             </button>
           )}
@@ -499,21 +512,15 @@ export default function AssignmentsSection({ event, assignments, departments, ca
           <button
             onClick={() => setFilterDeptId(null)}
             className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-              filterDeptId === null
-                ? 'bg-brown-500 text-white border-brown-500'
-                : 'border-cream-300 text-brown-500 hover:bg-cream-50'
+              filterDeptId === null ? 'bg-brown-500 text-white border-brown-500' : 'border-cream-300 text-brown-500 hover:bg-cream-50'
             }`}
-          >
-            All
-          </button>
+          >All</button>
           {usedDepts.map(d => (
             <button
               key={d.id}
               onClick={() => setFilterDeptId(filterDeptId === d.id ? null : d.id)}
               className={`text-xs px-2 py-0.5 rounded-full border transition-colors flex items-center gap-1 ${
-                filterDeptId === d.id
-                  ? 'text-white border-transparent'
-                  : 'border-cream-300 text-brown-500 hover:bg-cream-50'
+                filterDeptId === d.id ? 'text-white border-transparent' : 'border-cream-300 text-brown-500 hover:bg-cream-50'
               }`}
               style={filterDeptId === d.id ? { backgroundColor: d.color, borderColor: d.color } : {}}
             >
@@ -528,68 +535,118 @@ export default function AssignmentsSection({ event, assignments, departments, ca
       {adding && (
         <div className="border border-cream-200 rounded-lg p-3 space-y-2 bg-cream-50 mb-4">
 
-          {/* Day chips (multi-day events only) */}
-          {dayCount > 1 && (
-            <div>
-              <label className="block text-xs text-brown-300 mb-1">Day(s)</label>
-              <div className="flex flex-wrap gap-1.5">
-                {eventDays.map(day => {
-                  const active = selectedDates.includes(day)
-                  return (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => toggleDate(day)}
-                      className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                        active
-                          ? 'bg-brown-500 text-white border-brown-500'
-                          : 'border-cream-300 text-brown-600 hover:bg-cream-100'
-                      }`}
-                    >
-                      {formatDateShortWithDay(day)}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
+          {/* Day chips (always shown — includes prep/teardown support) */}
           <div>
-            <label className="block text-xs text-brown-300 mb-0.5">Department <span className="text-red-400">*</span></label>
-            <select
-              value={addForm.department_id}
-              onChange={e => setAdd('department_id', e.target.value)}
-              className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300"
-            >
-              <option value="">— Select —</option>
-              {departments.filter(d => d.active).map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
+            <label className="block text-xs text-brown-300 mb-1">Day(s)</label>
+            <div className="flex flex-wrap gap-1.5">
+              {/* Event day chips */}
+              {eventDays.map(day => {
+                const active = selectedDates.includes(day)
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleDate(day)}
+                    className={`text-xs px-2 py-1 rounded border transition-colors ${
+                      active
+                        ? 'bg-brown-500 text-white border-brown-500'
+                        : 'bg-white text-brown-500 border-cream-300 hover:bg-cream-50'
+                    }`}
+                  >
+                    {formatDateShortWithDay(day)}
+                  </button>
+                )
+              })}
+
+              {/* Prep / teardown chips for selected non-event days */}
+              {prepDates.map(day => {
+                const label = assignmentDateLabel(day, event)
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => setSelectedDates(prev => prev.filter(d => d !== day))}
+                    className="text-xs px-2 py-1 rounded border bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-colors"
+                  >
+                    {label}  ·  {formatDateShortWithDay(day)}  ×
+                  </button>
+                )
+              })}
+
+              {/* + Prep / other day */}
+              {!showPrepPicker && (
+                <button
+                  type="button"
+                  onClick={() => setShowPrepPicker(true)}
+                  className="text-xs px-2 py-1 rounded border border-dashed border-cream-400 text-brown-400 hover:border-brown-300 hover:text-brown-600 transition-colors"
+                >
+                  + Prep / other day
+                </button>
+              )}
+
+              {showPrepPicker && (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="date"
+                    value={prepPickerDate}
+                    min={dateMin}
+                    max={dateMax}
+                    onChange={e => setPrepPickerDate(e.target.value)}
+                    className="border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={addPrepDate}
+                    disabled={!prepPickerDate}
+                    className="text-xs bg-brown-500 hover:bg-brown-600 text-white px-2 py-1 rounded disabled:opacity-40 transition-colors"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowPrepPicker(false); setPrepPickerDate('') }}
+                    className="text-xs text-brown-400 hover:text-brown-600 px-1"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Single-day: show date input */}
-          {dayCount === 1 && (
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs text-brown-300 mb-0.5">Date</label>
-              <input
-                type="date"
-                value={addForm.task_date}
-                onChange={e => setAdd('task_date', e.target.value)}
+              <label className="block text-xs text-brown-300 mb-0.5">Department</label>
+              <select
+                value={addForm.department_id}
+                onChange={e => setAdd('department_id', e.target.value)}
                 className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300"
-              />
+              >
+                <option value="">— Select —</option>
+                {departments.filter(d => d.active).map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
             </div>
-          )}
+            <div className="flex flex-col justify-end">
+              <p className="text-xs text-brown-300 mb-0.5">
+                {selectedDates.length === 1
+                  ? (() => { const lbl = assignmentDateLabel(selectedDates[0], event); return lbl ? `${lbl}: ${formatDateShortWithDay(selectedDates[0])}` : formatDateShortWithDay(selectedDates[0]) })()
+                  : `${selectedDates.length} days selected`}
+              </p>
+            </div>
+          </div>
 
           <div>
-            <label className="block text-xs text-brown-300 mb-0.5">Task <span className="text-red-400">*</span></label>
+            <label className="block text-xs text-brown-300 mb-0.5">Task</label>
             <input
               value={addForm.task}
               onChange={e => setAdd('task', e.target.value)}
-              placeholder="Set up tables, Prepare appetizers…"
+              placeholder="Describe the task…"
               className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300"
             />
           </div>
+
           <div className="flex gap-2 items-end">
             <div className="flex-1">
               <label className="block text-xs text-brown-300 mb-0.5">Time (optional)</label>
@@ -602,6 +659,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
               <TimeTypeToggle value={addForm.time_type} onChange={v => setAdd('time_type', v)} />
             )}
           </div>
+
           <div>
             <label className="block text-xs text-brown-300 mb-0.5">Notes (optional)</label>
             <input
@@ -610,6 +668,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
               className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300"
             />
           </div>
+
           <div className="flex gap-2">
             <button
               onClick={handleAdd}
@@ -618,24 +677,22 @@ export default function AssignmentsSection({ event, assignments, departments, ca
             >
               {saving ? 'Adding…' : `Add${selectedDates.length > 1 ? ` (${selectedDates.length} days)` : ''}`}
             </button>
-            <button
-              onClick={() => { setAdding(false); setAddForm(blankForm(event.start_date)); setSelectedDates([event.start_date]) }}
-              className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1"
-            >
+            <button onClick={() => { setAdding(false); setAddForm(blankForm(event.start_date)); setSelectedDates([event.start_date]); setShowPrepPicker(false); setPrepPickerDate('') }}
+              className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1">
               Cancel
             </button>
           </div>
         </div>
       )}
 
-      {/* List */}
-      {visible.length === 0 && !adding ? (
-        <p className="text-sm text-brown-300">No assignments yet.</p>
-      ) : (
-        <div className="space-y-4">
-          {groupBy === 'department' ? renderByDepartment() : renderByDate()}
-        </div>
-      )}
+      {/* Assignment list */}
+      <div className="space-y-4">
+        {visible.length === 0 ? (
+          <p className="text-xs text-brown-300 text-center py-4">No assignments yet.</p>
+        ) : (
+          groupBy === 'department' ? renderByDepartment() : renderByDate()
+        )}
+      </div>
     </div>
   )
 }

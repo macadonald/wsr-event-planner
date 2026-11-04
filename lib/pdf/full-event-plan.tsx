@@ -3,7 +3,8 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { Assignment, Department, Event, EventBilling, EventNote, ScheduleItem } from '@/lib/types'
 import { formatDate, formatTime, formatTimestamp } from '@/lib/time'
 import { getDayCount, formatDateRange, shiftDate } from '@/lib/events'
-import { sortDeptsByPdfOrder, bandColor, tint, pdfDateShort, formatCollapsedDates, C, T, SP } from './shared'
+import { sortDeptsByPdfOrder, bandColor, tint, pdfDateShort, pdfDateShortWithLabel, formatCollapsedDates, C, T, SP } from './shared'
+import { isWithinHours } from '@/lib/time'
 
 // ── styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
@@ -127,7 +128,7 @@ type CollapsedRow = {
   dateRange: string
 }
 
-function DeptBlock({ dept, assignments }: { dept: Department; assignments: Assignment[] }) {
+function DeptBlock({ dept, assignments, recentHours, event }: { dept: Department; assignments: Assignment[]; recentHours: number; event: Event }) {
   const band = bandColor(dept.color)
   const rowTint = tint(dept.color, 0.08)
 
@@ -217,11 +218,12 @@ function DeptBlock({ dept, assignments }: { dept: Department; assignments: Assig
         return (
           <View key={date}>
             <View style={s.taskDateHead}>
-              <Text>{pdfDateShort(date)}</Text>
+              <Text>{pdfDateShortWithLabel(date, event)}</Text>
             </View>
             {[...untimed, ...timed].map(a => {
               const bg = rowIdx++ % 2 === 0 ? C.white : rowTint
               const isUntimed = !a.task_time
+              const isUpdated = recentHours > 0 && isWithinHours(a.updated_at, recentHours)
               return (
                 <View key={a.id} style={[s.taskRow, { backgroundColor: bg }]}>
                   <View style={s.taskTimeCol}>
@@ -234,9 +236,12 @@ function DeptBlock({ dept, assignments }: { dept: Department; assignments: Assig
                       </Text>
                     )}
                   </View>
-                  <View style={s.taskBody}>
-                    <Text style={s.taskText}>{a.task}</Text>
-                    {a.notes && <Text style={s.taskNote}>{a.notes}</Text>}
+                  <View style={[s.taskBody, { flexDirection: 'row', justifyContent: 'space-between' }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.taskText}>{a.task}</Text>
+                      {a.notes && <Text style={s.taskNote}>{a.notes}</Text>}
+                    </View>
+                    {isUpdated && <Text style={{ fontSize: T.note, color: C.amber, fontFamily: 'Helvetica-Bold', paddingLeft: 4 }}>UPDATED</Text>}
                   </View>
                 </View>
               )
@@ -258,9 +263,10 @@ type Props = {
   departments: Department[]
   notes: EventNote[]
   updatedByName: string | null
+  recentHours?: number
 }
 
-export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, assignments, departments, notes, updatedByName }: Props) {
+export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, assignments, departments, notes, updatedByName, recentHours = 0 }: Props) {
   const dayCount = getDayCount(event.start_date, event.end_date)
   const dateRange = formatDateRange(event.start_date, event.end_date)
 
@@ -384,7 +390,7 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
                   const items = schedByDate.get(date) ?? []
                   return (
                     <View key={date} style={s.dayCol}>
-                      <Text style={s.dayHead}>{pdfDateShort(date)}</Text>
+                      <Text style={s.dayHead}>{pdfDateShort(date)}</Text>{/* schedule stays on event days */}
                       {items.map(item => (
                         <View key={item.id} style={s.schedRow}>
                           <Text style={s.schedTime}>
@@ -414,9 +420,9 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
               const right = deptsWithWork[i * 2 + 1]
               return (
                 <View key={i} style={s.deptRow} wrap={false}>
-                  <DeptBlock dept={left} assignments={assignsByDept.get(left.id) ?? []} />
+                  <DeptBlock dept={left} assignments={assignsByDept.get(left.id) ?? []} recentHours={recentHours} event={event} />
                   {right
-                    ? <DeptBlock dept={right} assignments={assignsByDept.get(right.id) ?? []} />
+                    ? <DeptBlock dept={right} assignments={assignsByDept.get(right.id) ?? []} recentHours={recentHours} event={event} />
                     : <View style={s.deptBlock} />
                   }
                 </View>

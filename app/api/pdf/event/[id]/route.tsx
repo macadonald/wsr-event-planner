@@ -32,6 +32,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     { data: assignmentData },
     { data: departmentData },
     { data: notesData },
+    { data: settingData },
   ] = await Promise.all([
     supabase.from('events').select('*').eq('id', params.id).single(),
     canSeeBilling
@@ -41,6 +42,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     supabase.from('assignments').select('*').eq('event_id', params.id).order('task_date').order('task_time'),
     supabase.from('departments').select('*').order('sort_order'),
     supabase.from('event_notes').select('*').eq('event_id', params.id).order('sort_order').order('created_at'),
+    supabase.from('app_settings').select('value').eq('key', 'recent_changes_hours').single(),
   ])
 
   if (!eventData) return new Response('Not found', { status: 404 })
@@ -52,6 +54,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     updatedByName = updater?.full_name ?? null
   }
 
+  const recentHours = parseInt((settingData as { value: string } | null)?.value ?? '48', 10)
+
   const sharedProps = {
     event: eventData as Event,
     billing: billingData as EventBilling | null,
@@ -61,6 +65,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     departments: (departmentData ?? []) as Department[],
     notes: (notesData ?? []) as EventNote[],
     updatedByName,
+    recentHours,
   }
 
   type PdfArg = Parameters<typeof renderToBuffer>[0]

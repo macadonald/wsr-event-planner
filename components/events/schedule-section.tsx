@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Event, ScheduleItem } from '@/lib/types'
 import { createScheduleItem, updateScheduleItem, deleteScheduleItem } from '@/app/actions/schedule-items'
-import { formatDateWithDay, formatTime } from '@/lib/time'
+import { formatDateWithDay, formatTime, relativeTime, formatTimestamp, isWithinHours } from '@/lib/time'
 import { getDayCount, shiftDate } from '@/lib/events'
 import TimePicker from '@/components/ui/time-picker'
 
@@ -18,10 +18,14 @@ function ItemRow({
   item,
   eventId,
   canEdit,
+  profilesMap,
+  recentHours,
 }: {
   item: ScheduleItem
   eventId: string
   canEdit: boolean
+  profilesMap: Record<string, string | null>
+  recentHours: number
 }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -106,6 +110,9 @@ function ItemRow({
     )
   }
 
+  const updaterName = item.updated_by ? (profilesMap[item.updated_by] ?? null) : null
+  const isChanged = isWithinHours(item.updated_at, recentHours)
+
   return (
     <div className="flex items-start gap-3 py-2 group">
       <div className="w-20 shrink-0 text-xs text-brown-400 pt-0.5">
@@ -113,12 +120,22 @@ function ItemRow({
         {item.end_time && <><br /><span className="text-brown-300">{formatTime(item.end_time)}</span></>}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-brown-700">{item.title}</p>
+        <div className="flex items-baseline gap-1.5">
+          <p className="text-sm font-medium text-brown-700">{item.title}</p>
+          {isChanged && (
+            <span className="inline-block text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full leading-none shrink-0">
+              Changed
+            </span>
+          )}
+        </div>
         {(item.location || item.notes) && (
           <p className="text-xs text-brown-400 mt-0.5">
-            {item.location}{item.location && item.notes ? ' · ' : ''}{item.notes}
+            {item.location}{item.location && item.notes ? '  ·  ' : ''}{item.notes}
           </p>
         )}
+        <p className="text-xs text-brown-300 mt-0.5" title={formatTimestamp(item.updated_at)}>
+          Updated {relativeTime(item.updated_at)}{updaterName ? `  ·  ${updaterName}` : ''}
+        </p>
       </div>
       {canEdit && (
         <div className="flex gap-1 shrink-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:transition-opacity">
@@ -134,10 +151,14 @@ export default function ScheduleSection({
   event,
   items,
   canEdit,
+  profilesMap,
+  recentHours,
 }: {
   event: Event
   items: ScheduleItem[]
   canEdit: boolean
+  profilesMap: Record<string, string | null>
+  recentHours: number
 }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -250,7 +271,7 @@ export default function ScheduleSection({
                 <p className="text-xs font-semibold text-brown-500 mb-1">{formatDateWithDay(date)}</p>
                 <div className="divide-y divide-cream-100">
                   {dayItems.map(item => (
-                    <ItemRow key={item.id} item={item} eventId={event.id} canEdit={canEdit} />
+                    <ItemRow key={item.id} item={item} eventId={event.id} canEdit={canEdit} profilesMap={profilesMap} recentHours={recentHours} />
                   ))}
                 </div>
               </div>

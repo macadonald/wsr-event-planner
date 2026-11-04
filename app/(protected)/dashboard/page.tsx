@@ -10,15 +10,27 @@ export default async function DashboardPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user!.id).single()
 
   const today = todayInPhoenix()
-  const { data } = await supabase
-    .from('events')
-    .select('*')
-    .order('start_date', { ascending: true })
+
+  const [
+    { data },
+    { data: profilesData },
+    { data: settingData },
+  ] = await Promise.all([
+    supabase.from('events').select('*').order('start_date', { ascending: true }),
+    supabase.from('profiles').select('id, full_name'),
+    supabase.from('app_settings').select('value').eq('key', 'recent_changes_hours').single(),
+  ])
 
   const events = (data ?? []) as Event[]
   const upcoming = events.filter(e => e.end_date >= today)
   const past = events.filter(e => e.end_date < today).reverse()
 
+  const profilesMap: Record<string, string | null> = {}
+  for (const p of (profilesData ?? [])) {
+    profilesMap[p.id] = p.full_name
+  }
+
+  const recentHours = parseInt(settingData?.value ?? '48', 10)
   const canEdit = profile?.role === 'admin' || profile?.role === 'planner'
 
   return (
@@ -34,7 +46,7 @@ export default async function DashboardPage() {
           </Link>
         )}
       </div>
-      <EventsList upcoming={upcoming} past={past} />
+      <EventsList upcoming={upcoming} past={past} profilesMap={profilesMap} recentHours={recentHours} />
     </div>
   )
 }

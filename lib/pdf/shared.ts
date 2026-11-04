@@ -71,6 +71,9 @@ export const C = {
   note: '#777777',       // task notes
   white: '#FFFFFF',
   stripeOdd: '#F9F5F0',  // zebra odd rows (no dept color, just warm off-white)
+  amber: '#B45309',      // "UPDATED" badge text (readable on white)
+  prep: '#1D4ED8',       // Prep label text (blue-ish)
+  teardown: '#6B7280',   // Teardown label text (gray)
 } as const
 
 // ── type scale & spacing ────────────────────────────────────────────────────
@@ -110,6 +113,17 @@ export function pdfDateShort(date: string): string {
   const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' })
     .format(new Date(Date.UTC(y, m - 1, d)))
   return `${wd.toUpperCase()}  ${m}/${d}`
+}
+
+// "PREP  ·  THU 11/5" or "TEARDOWN  ·  MON 11/4" for dates outside event bounds.
+export function pdfDateShortWithLabel(
+  date: string,
+  event: { start_date: string; end_date: string },
+): string {
+  const base = pdfDateShort(date)
+  if (date < event.start_date) return `PREP  ·  ${base}`
+  if (date > event.end_date) return `TEARDOWN  ·  ${base}`
+  return base
 }
 
 // "Wed–Fri 11/4–11/6" (consecutive) or "Wed 11/4, Fri 11/6" (non-consecutive)

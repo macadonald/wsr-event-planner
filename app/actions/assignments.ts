@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { TimeType } from '@/lib/types'
 
 async function guardPlanner() {
@@ -11,7 +12,15 @@ async function guardPlanner() {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   if (!profile?.active) return null
   if (profile.role !== 'admin' && profile.role !== 'planner') return null
-  return { supabase, userId: user.id }
+  return { supabase, userId: user.id, actorName: profile.full_name ?? 'Unknown' }
+}
+
+async function logDeletion(eventId: string, actorId: string, actorName: string, summary: string) {
+  const admin = createAdminClient()
+  await admin.from('event_activity').insert({
+    event_id: eventId, actor_id: actorId, actor_name: actorName,
+    action: 'deleted', entity_type: 'assignment', summary,
+  })
 }
 
 export type AssignmentFormData = {
@@ -31,10 +40,8 @@ export async function createAssignment(
   if (!ctx) return { error: 'Unauthorized' }
 
   const { error } = await ctx.supabase.from('assignments').insert({
-    event_id: eventId,
-    ...data,
-    created_by: ctx.userId,
-    updated_by: ctx.userId,
+    event_id: eventId, ...data,
+    created_by: ctx.userId, updated_by: ctx.userId,
   })
 
   if (error) return { error: error.message }
@@ -42,7 +49,7 @@ export async function createAssignment(
   return { error: null }
 }
 
-// Creates one assignment per date in dates[]. If dates.length > 1, all rows share a repeat_group_id.
+// Creates one assignment per date. If dates.length > 1, all rows share a repeat_group_id.
 export async function createAssignments(
   eventId: string,
   dates: string[],
@@ -56,31 +63,12 @@ export async function createAssignments(
 
   const groupId = crypto.randomUUID()
   const rows = dates.map(d => ({
-    event_id: eventId,
-    ...data,
-    task_date: d,
+    event_id: eventId, ...data, task_date: d,
     repeat_group_id: groupId,
-    created_by: ctx.userId,
-    updated_by: ctx.userId,
+    created_by: ctx.userId, updated_by: ctx.userId,
   }))
 
   const { error } = await ctx.supabase.from('assignments').insert(rows)
-  if (error) return { error: error.message }
-  revalidatePath(`/events/${eventId}`)
-  return { error: null }
-}
-
-export async function deleteAssignmentGroup(
-  repeatGroupId: string,
-  eventId: string,
-): Promise<{ error: string | null }> {
-  const ctx = await guardPlanner()
-  if (!ctx) return { error: 'Unauthorized' }
-
-  const { error } = await ctx.supabase
-    .from('assignments')
-    .delete()
-    .eq('repeat_group_id', repeatGroupId)
   if (error) return { error: error.message }
   revalidatePath(`/events/${eventId}`)
   return { error: null }
@@ -128,8 +116,50 @@ export async function deleteAssignment(
   const ctx = await guardPlanner()
   if (!ctx) return { error: 'Unauthorized' }
 
+  // Fetch before deleting to build the activity log entry
+  const { data: a } = await ctx.supabase
+    .from('assignments')
+    .select('task, department_id, departments!inner(name)')
+    .eq('id', id)
+    .single()
+
   const { error } = await ctx.supabase.from('assignments').delete().eq('id', id)
   if (error) return { error: error.message }
+
+  if (a) {
+    const deptName = (a as unknown as { departments: { name: string } }).departments?.name ?? ''
+    await logDeletion(eventId, ctx.userId, ctx.actorName, `${deptName}: ${a.task}`)
+  }
+
+  revalidatePath(`/events/${eventId}`)
+  return { error: null }
+}
+
+export async function deleteAssignmentGroup(
+  repeatGroupId: string,
+  eventId: string,
+): Promise<{ error: string | null }> {
+  const ctx = await guardPlanner()
+  if (!ctx) return { error: 'Unauthorized' }
+
+  const { data: rows } = await ctx.supabase
+    .from('assignments')
+    .select('task, department_id, departments!inner(name)')
+    .eq('repeat_group_id', repeatGroupId)
+
+  const { error } = await ctx.supabase
+    .from('assignments')
+    .delete()
+    .eq('repeat_group_id', repeatGroupId)
+  if (error) return { error: error.message }
+
+  if (rows?.length) {
+    const first = rows[0] as unknown as { task: string; departments: { name: string } }
+    const deptName = first.departments?.name ?? ''
+    const count = rows.length
+    await logDeletion(eventId, ctx.userId, ctx.actorName, `${deptName}: ${first.task} (${count} day${count > 1 ? 's' : ''})`)
+  }
+
   revalidatePath(`/events/${eventId}`)
   return { error: null }
 }

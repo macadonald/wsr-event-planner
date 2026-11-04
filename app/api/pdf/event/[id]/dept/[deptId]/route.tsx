@@ -29,12 +29,14 @@ export async function GET(
     { data: scheduleData },
     { data: assignmentData },
     { data: notesData },
+    { data: settingData },
   ] = await Promise.all([
     supabase.from('events').select('*').eq('id', params.id).single(),
     supabase.from('departments').select('*').eq('id', params.deptId).single(),
     supabase.from('schedule_items').select('*').eq('event_id', params.id).order('item_date').order('start_time'),
     supabase.from('assignments').select('*').eq('event_id', params.id).order('task_date').order('task_time'),
     supabase.from('event_notes').select('*').eq('event_id', params.id).order('sort_order').order('created_at'),
+    supabase.from('app_settings').select('value').eq('key', 'recent_changes_hours').single(),
   ])
 
   if (!eventData || !deptData) return new Response('Not found', { status: 404 })
@@ -46,6 +48,8 @@ export async function GET(
     updatedByName = updater?.full_name ?? null
   }
 
+  const recentHours = parseInt((settingData as { value: string } | null)?.value ?? '48', 10)
+
   const sharedProps = {
     event: eventData as Event,
     department: deptData as Department,
@@ -53,6 +57,7 @@ export async function GET(
     assignments: (assignmentData ?? []) as Assignment[],
     notes: (notesData ?? []) as EventNote[],
     updatedByName,
+    recentHours,
   }
 
   type PdfArg = Parameters<typeof renderToBuffer>[0]

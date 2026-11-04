@@ -3,7 +3,8 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { Assignment, Department, Event, EventNote, ScheduleItem } from '@/lib/types'
 import { formatTime, formatTimestamp } from '@/lib/time'
 import { getDayCount, formatDateRange } from '@/lib/events'
-import { bandColor, tint, pdfDateShort, formatCollapsedDates, C, T, SP } from './shared'
+import { bandColor, tint, pdfDateShort, pdfDateShortWithLabel, formatCollapsedDates, C, T, SP } from './shared'
+import { isWithinHours } from '@/lib/time'
 
 const s = StyleSheet.create({
   page: {
@@ -132,7 +133,7 @@ function buildDeptRows(deptAssignments: Assignment[]) {
   return { collapsedRows, byDate, dates }
 }
 
-function DeptSection({ dept, assignments, rowTint }: { dept: Department; assignments: Assignment[]; rowTint: string }) {
+function DeptSection({ dept, assignments, rowTint, event, recentHours }: { dept: Department; assignments: Assignment[]; rowTint: string; event: Event; recentHours: number }) {
   const band = bandColor(dept.color)
   const { collapsedRows, byDate, dates } = buildDeptRows(assignments)
   let rowIdx = 0
@@ -169,9 +170,10 @@ function DeptSection({ dept, assignments, rowTint }: { dept: Department; assignm
         const timed = items.filter(a => a.task_time).sort((a, b) => (a.task_time! > b.task_time! ? 1 : -1))
         return (
           <View key={date}>
-            <View style={s.taskDateHead}><Text>{pdfDateShort(date)}</Text></View>
+            <View style={s.taskDateHead}><Text>{pdfDateShortWithLabel(date, event)}</Text></View>
             {[...untimed, ...timed].map(a => {
               const bg = rowIdx++ % 2 === 0 ? C.white : rowTint
+              const isUpd = recentHours > 0 && isWithinHours(a.updated_at, recentHours)
               return (
                 <View key={a.id} style={[s.taskRow, { backgroundColor: bg }]}>
                   <View style={s.taskTimeCol}>
@@ -182,7 +184,7 @@ function DeptSection({ dept, assignments, rowTint }: { dept: Department; assignm
                     )}
                   </View>
                   <View style={s.taskBody}>
-                    <Text style={s.taskText}>{a.task}</Text>
+                    <Text style={s.taskText}>{a.task}{isUpd && <Text style={{ fontSize: T.note, color: C.amber, fontFamily: 'Helvetica-Bold', paddingLeft: 4 }}>  UPDATED</Text>}</Text>
                     {a.notes && <Text style={s.taskNote}>{a.notes}</Text>}
                   </View>
                 </View>
@@ -266,9 +268,10 @@ type Props = {
   notes: EventNote[]
   updatedByName: string | null
   layout: 'paged' | 'combined'
+  recentHours?: number
 }
 
-export function MultiDeptSheetPDF({ event, departments, assignments, scheduleItems, notes, updatedByName, layout }: Props) {
+export function MultiDeptSheetPDF({ event, departments, assignments, scheduleItems, notes, updatedByName, layout, recentHours = 0 }: Props) {
   const dayCount = getDayCount(event.start_date, event.end_date)
   const dateRange = formatDateRange(event.start_date, event.end_date)
   const deptNotes = notes.filter(n => n.print_on_dept_sheets)
@@ -290,7 +293,7 @@ export function MultiDeptSheetPDF({ event, departments, assignments, scheduleIte
               <PageHeader event={event} dayCount={dayCount} dateRange={dateRange} updatedByName={updatedByName} />
               <SummaryBar event={event} />
               <ScheduleSection scheduleItems={scheduleItems} />
-              <DeptSection dept={dept} assignments={deptAssignments} rowTint={rowTint} />
+              <DeptSection dept={dept} assignments={deptAssignments} rowTint={rowTint} event={event} recentHours={recentHours} />
               {deptNotes.length > 0 && (
                 <View style={s.notesWrap}>
                   <Text style={s.secLabel}>NOTES</Text>
@@ -317,7 +320,7 @@ export function MultiDeptSheetPDF({ event, departments, assignments, scheduleIte
           const deptAssignments = assignsByDept.get(dept.id) ?? []
           const rowTint = tint(dept.color, 0.08)
           return (
-            <DeptSection key={dept.id} dept={dept} assignments={deptAssignments} rowTint={rowTint} />
+            <DeptSection key={dept.id} dept={dept} assignments={deptAssignments} rowTint={rowTint} event={event} recentHours={recentHours} />
           )
         })}
         {deptNotes.length > 0 && (

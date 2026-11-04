@@ -2,7 +2,7 @@ import React from 'react'
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { Department } from '@/lib/types'
 import type { RunSheetAssignment } from './run-sheet'
-import { formatTime } from '@/lib/time'
+import { formatTime, isWithinHours } from '@/lib/time'
 import { bandColor } from './shared'
 import { registerLedgerFonts } from './fonts'
 import { rlColHead, rlDateShort } from './ranch-ledger-plan'
@@ -75,11 +75,12 @@ function dateRangeLabel(fromDate: string, toDate: string): string {
   return `${rlColHead(fromDate)} – ${rlColHead(toDate)}`
 }
 
-function RLDeptPage({ department, assignments, fromDate, toDate }: {
+function RLDeptPage({ department, assignments, fromDate, toDate, recentHours = 0 }: {
   department: Department
   assignments: RunSheetAssignment[]
   fromDate: string
   toDate: string
+  recentHours?: number
 }) {
   const band = bandColor(department.color)
   const byDate = new Map<string, RunSheetAssignment[]>()
@@ -122,24 +123,27 @@ function RLDeptPage({ department, assignments, fromDate, toDate }: {
           return (
             <View key={date} style={s.daySec} wrap={false}>
               <Text style={s.dayHead}>{rlColHead(date)}</Text>
-              {[...untimed, ...timed].map(a => (
-                <View key={a.id} style={s.taskRow}>
-                  <View style={s.timeCol}>
-                    <Text style={s.timeDay}>{rlDateShort(a.task_date)}</Text>
-                    <Text style={s.timeLabel}>
-                      {a.task_time
-                        ? `${a.time_type === 'by' ? 'By' : 'At'} ${formatTime(a.task_time)}`
-                        : 'General'}
-                    </Text>
+              {[...untimed, ...timed].map(a => {
+                const dateLabel = a.task_date < a.event_start_date ? 'Prep' : a.task_date > a.event_end_date ? 'Teardown' : null
+                const isUpd = recentHours > 0 && isWithinHours(a.updated_at, recentHours)
+                const metaLine = [a.event_name, a.event_location, dateLabel ? `(${dateLabel})` : null].filter(Boolean).join('  ·  ')
+                return (
+                  <View key={a.id} style={s.taskRow}>
+                    <View style={s.timeCol}>
+                      <Text style={s.timeDay}>{rlDateShort(a.task_date)}</Text>
+                      <Text style={s.timeLabel}>
+                        {a.task_time
+                          ? `${a.time_type === 'by' ? 'By' : 'At'} ${formatTime(a.task_time)}`
+                          : 'General'}
+                      </Text>
+                    </View>
+                    <View style={s.taskCol}>
+                      <Text style={s.taskText}>{a.task}{isUpd && <Text style={{ fontSize: NOTE, color: '#B45309', fontFamily: 'Inter', fontWeight: 700, paddingLeft: 4 }}>  UPDATED</Text>}</Text>
+                      <Text style={s.taskMeta}>{metaLine}</Text>
+                    </View>
                   </View>
-                  <View style={s.taskCol}>
-                    <Text style={s.taskText}>{a.task}</Text>
-                    <Text style={s.taskMeta}>
-                      {a.event_name}{a.event_location ? `  ·  ${a.event_location}` : ''}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+                )
+              })}
             </View>
           )
         })
@@ -148,7 +152,7 @@ function RLDeptPage({ department, assignments, fromDate, toDate }: {
   )
 }
 
-function RLCombinedDeptSection({ dept, assignments }: { dept: Department; assignments: RunSheetAssignment[] }) {
+function RLCombinedDeptSection({ dept, assignments, recentHours = 0 }: { dept: Department; assignments: RunSheetAssignment[]; recentHours?: number }) {
   const band = bandColor(dept.color)
   const byDate = new Map<string, RunSheetAssignment[]>()
   for (const a of assignments) {
@@ -174,24 +178,27 @@ function RLCombinedDeptSection({ dept, assignments }: { dept: Department; assign
           return (
             <View key={date}>
               <Text style={[s.dayHead, { paddingLeft: 4 }]}>{rlColHead(date)}</Text>
-              {[...untimed, ...timed].map(a => (
-                <View key={a.id} style={s.taskRow}>
-                  <View style={s.timeCol}>
-                    <Text style={s.timeDay}>{rlDateShort(a.task_date)}</Text>
-                    <Text style={s.timeLabel}>
-                      {a.task_time
-                        ? `${a.time_type === 'by' ? 'By' : 'At'} ${formatTime(a.task_time)}`
-                        : 'General'}
-                    </Text>
+              {[...untimed, ...timed].map(a => {
+                const dateLabel = a.task_date < a.event_start_date ? 'Prep' : a.task_date > a.event_end_date ? 'Teardown' : null
+                const isUpd = recentHours > 0 && isWithinHours(a.updated_at, recentHours)
+                const metaLine = [a.event_name, a.event_location, dateLabel ? `(${dateLabel})` : null].filter(Boolean).join('  ·  ')
+                return (
+                  <View key={a.id} style={s.taskRow}>
+                    <View style={s.timeCol}>
+                      <Text style={s.timeDay}>{rlDateShort(a.task_date)}</Text>
+                      <Text style={s.timeLabel}>
+                        {a.task_time
+                          ? `${a.time_type === 'by' ? 'By' : 'At'} ${formatTime(a.task_time)}`
+                          : 'General'}
+                      </Text>
+                    </View>
+                    <View style={s.taskCol}>
+                      <Text style={s.taskText}>{a.task}{isUpd && <Text style={{ fontSize: NOTE, color: '#B45309', fontFamily: 'Inter', fontWeight: 700, paddingLeft: 4 }}>  UPDATED</Text>}</Text>
+                      <Text style={s.taskMeta}>{metaLine}</Text>
+                    </View>
                   </View>
-                  <View style={s.taskCol}>
-                    <Text style={s.taskText}>{a.task}</Text>
-                    <Text style={s.taskMeta}>
-                      {a.event_name}{a.event_location ? `  ·  ${a.event_location}` : ''}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+                )
+              })}
             </View>
           )
         })
@@ -206,9 +213,10 @@ type Props = {
   fromDate: string
   toDate: string
   layout?: 'paged' | 'combined'
+  recentHours?: number
 }
 
-export function RanchLedgerRunSheetPDF({ departments, assignmentsByDept, fromDate, toDate, layout = 'paged' }: Props) {
+export function RanchLedgerRunSheetPDF({ departments, assignmentsByDept, fromDate, toDate, layout = 'paged', recentHours = 0 }: Props) {
   const deptsWithWork = departments.filter(d => (assignmentsByDept.get(d.id)?.length ?? 0) > 0)
 
   if (layout === 'combined' && deptsWithWork.length > 1) {
@@ -242,6 +250,7 @@ export function RanchLedgerRunSheetPDF({ departments, assignmentsByDept, fromDat
                 key={dept.id}
                 dept={dept}
                 assignments={assignmentsByDept.get(dept.id) ?? []}
+                recentHours={recentHours}
               />
             ))
           )}
@@ -259,6 +268,7 @@ export function RanchLedgerRunSheetPDF({ departments, assignmentsByDept, fromDat
           assignments={assignmentsByDept.get(dept.id) ?? []}
           fromDate={fromDate}
           toDate={toDate}
+          recentHours={recentHours}
         />
       ))}
       {deptsWithWork.length === 0 && (

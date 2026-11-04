@@ -81,3 +81,18 @@ export const STATUS_LABELS: Record<DisplayStatus, string> = {
   finalized: 'Finalized',
   completed: 'Completed',
 }
+
+// Label for assignment dates outside event bounds. Returns null for event days.
+export function assignmentDateLabel(
+  date: string,
+  event: { start_date: string; end_date: string },
+): 'Prep' | 'Teardown' | null {
+  if (date < event.start_date) return 'Prep'
+  if (date > event.end_date) return 'Teardown'
+  return null
+}
+
+// Allowed date range for assignments: 7 days before start, 2 days after end.
+export function assignmentDateRange(event: { start_date: string; end_date: string }) {
+  return { min: shiftDate(event.start_date, -7), max: shiftDate(event.end_date, 2) }
+}

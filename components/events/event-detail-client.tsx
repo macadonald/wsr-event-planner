@@ -3,8 +3,8 @@
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Event, EventBilling, ScheduleItem, Assignment, Department, EventNote } from '@/lib/types'
-import { formatTimestamp } from '@/lib/time'
+import type { Event, EventBilling, ScheduleItem, Assignment, Department, EventNote, EventActivity } from '@/lib/types'
+import { formatTimestamp, relativeTime } from '@/lib/time'
 import { getDisplayStatus, getDayCount, STATUS_COLORS, STATUS_LABELS, EVENT_TYPE_COLORS } from '@/lib/events'
 import { setEventStatus, deleteEvent } from '@/app/actions/events'
 import EventInfoSection from './event-info-section'
@@ -14,6 +14,7 @@ import ScheduleSection from './schedule-section'
 import AssignmentsSection from './assignments-section'
 import NotesSection from './notes-section'
 import DuplicateModal from './duplicate-modal'
+import ActivityPanel from './activity-panel'
 
 type Props = {
   event: Event
@@ -24,9 +25,12 @@ type Props = {
   notes: EventNote[]
   updatedByName: string | null
   canEdit: boolean
+  profilesMap: Record<string, string | null>
+  recentHours: number
+  activity: EventActivity[]
 }
 
-export default function EventDetailClient({ event, billing, scheduleItems, assignments, departments, notes, updatedByName, canEdit }: Props) {
+export default function EventDetailClient({ event, billing, scheduleItems, assignments, departments, notes, updatedByName, canEdit, profilesMap, recentHours, activity }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [showDuplicate, setShowDuplicate] = useState(false)
@@ -77,7 +81,7 @@ export default function EventDetailClient({ event, billing, scheduleItems, assig
           <p className="text-xs text-brown-300 mt-1">
             {dayCount === 1 ? '1 day' : `${dayCount} days`}
             {updatedByName && (
-              <> · Last edited by {updatedByName} at {formatTimestamp(event.updated_at)}</>
+              <> · Updated <span title={formatTimestamp(event.updated_at)}>{relativeTime(event.updated_at)}</span> by {updatedByName}</>
             )}
           </p>
         </div>
@@ -245,9 +249,10 @@ export default function EventDetailClient({ event, billing, scheduleItems, assig
       <EventInfoSection event={event} canEdit={canEdit} />
       <ContactsSection event={event} canEdit={canEdit} />
       {canEdit && <BillingSection eventId={event.id} billing={billing} />}
-      <ScheduleSection event={event} items={scheduleItems} canEdit={canEdit} />
-      <AssignmentsSection event={event} assignments={assignments} departments={departments} canEdit={canEdit} />
-      <NotesSection eventId={event.id} notes={notes} canEdit={canEdit} />
+      <ScheduleSection event={event} items={scheduleItems} canEdit={canEdit} profilesMap={profilesMap} recentHours={recentHours} />
+      <AssignmentsSection event={event} assignments={assignments} departments={departments} canEdit={canEdit} profilesMap={profilesMap} recentHours={recentHours} />
+      <NotesSection eventId={event.id} notes={notes} canEdit={canEdit} profilesMap={profilesMap} recentHours={recentHours} />
+      <ActivityPanel activity={activity} />
 
       {showDuplicate && (
         <DuplicateModal

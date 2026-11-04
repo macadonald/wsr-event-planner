@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 async function guardPlanner() {
   const supabase = createClient()
@@ -10,7 +11,7 @@ async function guardPlanner() {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   if (!profile?.active) return null
   if (profile.role !== 'admin' && profile.role !== 'planner') return null
-  return { supabase, userId: user.id }
+  return { supabase, userId: user.id, actorName: profile.full_name ?? 'Unknown' }
 }
 
 export type NoteFormData = {
@@ -71,8 +72,21 @@ export async function deleteNote(
   const ctx = await guardPlanner()
   if (!ctx) return { error: 'Unauthorized' }
 
+  const { data: note } = await ctx.supabase
+    .from('event_notes').select('content').eq('id', id).single()
+
   const { error } = await ctx.supabase.from('event_notes').delete().eq('id', id)
   if (error) return { error: error.message }
+
+  if (note) {
+    const admin = createAdminClient()
+    await admin.from('event_activity').insert({
+      event_id: eventId, actor_id: ctx.userId, actor_name: ctx.actorName,
+      action: 'deleted', entity_type: 'note',
+      summary: 'Note: ' + note.content.slice(0, 80) + (note.content.length > 80 ? '…' : ''),
+    })
+  }
+
   revalidatePath(`/events/${eventId}`)
   return { error: null }
 }

@@ -3,7 +3,8 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { Assignment, Department, Event, EventNote, ScheduleItem } from '@/lib/types'
 import { formatTime, formatTimestamp } from '@/lib/time'
 import { getDayCount, formatDateRange } from '@/lib/events'
-import { bandColor, tint, pdfDateShort, formatCollapsedDates, C, T, SP } from './shared'
+import { bandColor, tint, pdfDateShort, pdfDateShortWithLabel, formatCollapsedDates, C, T, SP } from './shared'
+import { isWithinHours } from '@/lib/time'
 
 const s = StyleSheet.create({
   page: {
@@ -95,9 +96,10 @@ type Props = {
   assignments: Assignment[]
   notes: EventNote[]
   updatedByName: string | null
+  recentHours?: number
 }
 
-export function DepartmentSheetPDF({ event, department, scheduleItems, assignments, notes, updatedByName }: Props) {
+export function DepartmentSheetPDF({ event, department, scheduleItems, assignments, notes, updatedByName, recentHours = 0 }: Props) {
   const dayCount = getDayCount(event.start_date, event.end_date)
   const dateRange = formatDateRange(event.start_date, event.end_date)
   const band = bandColor(department.color)
@@ -269,7 +271,7 @@ export function DepartmentSheetPDF({ event, department, scheduleItems, assignmen
             if (row.type === 'dateHead') {
               return (
                 <View key={`dh-${row.date}`} style={s.taskDateHead}>
-                  <Text>{pdfDateShort(row.date)}</Text>
+                  <Text>{pdfDateShortWithLabel(row.date, event)}</Text>
                 </View>
               )
             }
@@ -299,6 +301,7 @@ export function DepartmentSheetPDF({ event, department, scheduleItems, assignmen
             const a = row.assignment
             const bg = taskRowIdx++ % 2 === 0 ? C.white : rowTint
             const isUntimed = !a.task_time
+            const isUpdated = recentHours > 0 && isWithinHours(a.updated_at, recentHours)
             return (
               <View key={a.id} style={[s.taskRow, { backgroundColor: bg }]}>
                 <View style={s.taskTimeCol}>
@@ -312,7 +315,7 @@ export function DepartmentSheetPDF({ event, department, scheduleItems, assignmen
                   )}
                 </View>
                 <View style={s.taskBody}>
-                  <Text style={s.taskText}>{a.task}</Text>
+                  <Text style={s.taskText}>{a.task}{isUpdated && <Text style={{ fontSize: T.note, color: C.amber, fontFamily: 'Helvetica-Bold', paddingLeft: 4 }}>  UPDATED</Text>}</Text>
                   {a.notes && <Text style={s.taskNote}>{a.notes}</Text>}
                 </View>
               </View>

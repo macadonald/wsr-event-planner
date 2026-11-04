@@ -177,6 +177,8 @@ async function main() {
       event_name: EVENT.name,
       event_location: EVENT.location,
       event_pax: EVENT.pax,
+      event_start_date: EVENT.start_date,
+      event_end_date: EVENT.end_date,
     })
   }
 

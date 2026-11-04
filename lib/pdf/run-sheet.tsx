@@ -2,6 +2,7 @@ import React from 'react'
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { Assignment, Department } from '@/lib/types'
 import { C, T, SP, bandColor, tint, taskTimeLabel, pdfDateShort } from './shared'
+import { isWithinHours } from '@/lib/time'
 
 const s = StyleSheet.create({
   page: {
@@ -52,6 +53,8 @@ export type RunSheetAssignment = Assignment & {
   event_name: string
   event_location: string | null
   event_pax: number | null
+  event_start_date: string
+  event_end_date: string
 }
 
 type SingleDeptProps = {
@@ -59,9 +62,10 @@ type SingleDeptProps = {
   assignments: RunSheetAssignment[]
   fromDate: string
   toDate: string
+  recentHours?: number
 }
 
-function DeptPage({ department, assignments, fromDate, toDate }: SingleDeptProps) {
+function DeptPage({ department, assignments, fromDate, toDate, recentHours = 0 }: SingleDeptProps) {
   const band = bandColor(department.color)
   const rowTint = tint(department.color, 0.08)
 
@@ -111,7 +115,10 @@ function DeptPage({ department, assignments, fromDate, toDate }: SingleDeptProps
               const metaParts = [a.event_name]
               if (a.event_location) metaParts.push(a.event_location)
               if (a.event_pax != null && a.event_pax > 0) metaParts.push(`${a.event_pax} pax`)
+              const dateLabel = a.task_date < a.event_start_date ? 'Prep' : a.task_date > a.event_end_date ? 'Teardown' : null
+              if (dateLabel) metaParts.push(`(${dateLabel})`)
               if (a.notes) metaParts.push(a.notes)
+              const isUpdated = recentHours > 0 && isWithinHours(a.updated_at, recentHours)
 
               return (
                 <View key={a.id} style={[s.taskRow, { backgroundColor: bg }]}>
@@ -127,7 +134,7 @@ function DeptPage({ department, assignments, fromDate, toDate }: SingleDeptProps
                     )}
                   </View>
                   <View style={s.taskCol}>
-                    <Text style={s.taskText}>{a.task}</Text>
+                    <Text style={s.taskText}>{a.task}{isUpdated && <Text style={{ fontSize: T.note, color: C.amber, fontFamily: 'Helvetica-Bold', paddingLeft: 4 }}>  UPDATED</Text>}</Text>
                     <Text style={s.taskMeta}>{metaParts.join('  ·  ')}</Text>
                   </View>
                 </View>
@@ -142,7 +149,7 @@ function DeptPage({ department, assignments, fromDate, toDate }: SingleDeptProps
 
 // ── combined layout (all depts, one flowing document) ────────────────────────
 
-function CombinedDeptSection({ dept, assignments }: { dept: Department; assignments: RunSheetAssignment[] }) {
+function CombinedDeptSection({ dept, assignments, recentHours = 0 }: { dept: Department; assignments: RunSheetAssignment[]; recentHours?: number }) {
   const band = bandColor(dept.color)
   const rowTint = tint(dept.color, 0.08)
 
@@ -179,7 +186,10 @@ function CombinedDeptSection({ dept, assignments }: { dept: Department; assignme
               const bg = i % 2 === 0 ? C.white : rowTint
               const metaParts = [a.event_name]
               if (a.event_location) metaParts.push(a.event_location)
+              const dateLabelC = a.task_date < a.event_start_date ? 'Prep' : a.task_date > a.event_end_date ? 'Teardown' : null
+              if (dateLabelC) metaParts.push(`(${dateLabelC})`)
               if (a.notes) metaParts.push(a.notes)
+              const isUpdatedC = recentHours > 0 && isWithinHours(a.updated_at, recentHours)
               return (
                 <View key={a.id} style={[s.taskRow, { backgroundColor: bg }]}>
                   <View style={s.timeCol}>
@@ -193,7 +203,7 @@ function CombinedDeptSection({ dept, assignments }: { dept: Department; assignme
                     )}
                   </View>
                   <View style={s.taskCol}>
-                    <Text style={s.taskText}>{a.task}</Text>
+                    <Text style={s.taskText}>{a.task}{isUpdatedC && <Text style={{ fontSize: T.note, color: C.amber, fontFamily: 'Helvetica-Bold', paddingLeft: 4 }}>  UPDATED</Text>}</Text>
                     <Text style={s.taskMeta}>{metaParts.join('  ·  ')}</Text>
                   </View>
                 </View>
@@ -214,9 +224,10 @@ type Props = {
   fromDate: string
   toDate: string
   layout?: 'paged' | 'combined'
+  recentHours?: number
 }
 
-export function RunSheetPDF({ departments, assignmentsByDept, fromDate, toDate, layout = 'paged' }: Props) {
+export function RunSheetPDF({ departments, assignmentsByDept, fromDate, toDate, layout = 'paged', recentHours = 0 }: Props) {
   const deptsWithWork = departments.filter(d => (assignmentsByDept.get(d.id)?.length ?? 0) > 0)
 
   if (layout === 'combined' && deptsWithWork.length > 1) {
@@ -243,6 +254,7 @@ export function RunSheetPDF({ departments, assignmentsByDept, fromDate, toDate, 
                 key={dept.id}
                 dept={dept}
                 assignments={assignmentsByDept.get(dept.id) ?? []}
+                recentHours={recentHours}
               />
             ))
           )}
@@ -261,6 +273,7 @@ export function RunSheetPDF({ departments, assignmentsByDept, fromDate, toDate, 
           assignments={assignmentsByDept.get(dept.id) ?? []}
           fromDate={fromDate}
           toDate={toDate}
+          recentHours={recentHours}
         />
       ))}
       {deptsWithWork.length === 0 && (
