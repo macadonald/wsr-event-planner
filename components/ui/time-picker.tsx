@@ -13,6 +13,7 @@ function buildTimes(): { value: string; label: string }[] {
       result.push({ value, label: formatTime(value) })
     }
   }
+  result.push({ value: '00:00', label: '12:00 AM (midnight)' })
   return result
 }
 
@@ -159,10 +160,10 @@ export default function TimePicker({ value, onChange, placeholder = 'None', size
       else if (query === '') select('')
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      onChange(stepTime(value, -1))
+      onChange(stepTime(value, 1))
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
-      onChange(stepTime(value, 1))
+      onChange(stepTime(value, -1))
     } else if (e.key === 'Escape') {
       setOpen(false)
       setQuery('')
@@ -195,18 +196,18 @@ export default function TimePicker({ value, onChange, placeholder = 'None', size
       <button
         type="button"
         tabIndex={-1}
-        onMouseDown={e => { e.preventDefault(); onChange(stepTime(value, -1)) }}
+        onMouseDown={e => { e.preventDefault(); onChange(stepTime(value, 1)) }}
         className={`${btnClass} border-l-0`}
-        aria-label="Earlier"
+        aria-label="Later"
       >
         ▲
       </button>
       <button
         type="button"
         tabIndex={-1}
-        onMouseDown={e => { e.preventDefault(); onChange(stepTime(value, 1)) }}
+        onMouseDown={e => { e.preventDefault(); onChange(stepTime(value, -1)) }}
         className={`${btnClass} border-l-0 rounded-r`}
-        aria-label="Later"
+        aria-label="Earlier"
       >
         ▼
       </button>

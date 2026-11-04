@@ -9,6 +9,7 @@ import React from 'react'
 import { FullEventPlanPDF } from '@/lib/pdf/full-event-plan'
 import { DepartmentSheetPDF } from '@/lib/pdf/department-sheet'
 import { RunSheetPDF } from '@/lib/pdf/run-sheet'
+import { MultiDeptSheetPDF } from '@/lib/pdf/multi-dept-sheet'
 import type { RunSheetAssignment } from '@/lib/pdf/run-sheet'
 import type { Assignment, Department, Event, EventBilling, ScheduleItem } from '@/lib/types'
 
@@ -81,11 +82,17 @@ const SCHEDULE: ScheduleItem[] = [
 
 // ── mock assignments ─────────────────────────────────────────────────────────
 let aid = 1
-function a(dept: Department, date: string, time: string | null, time_type: 'at' | 'by', task: string, notes?: string): Assignment {
-  return { id: `a${aid++}`, event_id: 'e1', department_id: dept.id, task, task_date: date, task_time: time, time_type, notes: notes ?? null, repeat_group_id: null, completed_at: null, completed_by: null, created_by: 'u1', updated_by: 'u1', created_at: '', updated_at: '' }
+let gid = 1
+function a(dept: Department, date: string, time: string | null, time_type: 'at' | 'by', task: string, notes?: string, repeatGroupId?: string): Assignment {
+  return { id: `a${aid++}`, event_id: 'e1', department_id: dept.id, task, task_date: date, task_time: time, time_type, notes: notes ?? null, repeat_group_id: repeatGroupId ?? null, completed_at: null, completed_by: null, created_by: 'u1', updated_by: 'u1', created_at: '', updated_at: '' }
 }
+function grp() { return `g${gid++}` }
 
 const SETUP = DEPTS[0], KITCHEN = DEPTS[1], CORRAL = DEPTS[2], ACTIVITIES = DEPTS[3], HOUSEKEEPING = DEPTS[4], FRONTDESK = DEPTS[5]
+
+// Repeat groups for testing collapse
+const HK_CLEAN_GRP = grp()   // Housekeeping: same task all 3 days
+const KITCHEN_BFAST_GRP = grp() // Kitchen: breakfast set-up Wed+Thu+Fri (collapsed)
 
 const ASSIGNMENTS: Assignment[] = [
   // Set-Up
@@ -98,10 +105,12 @@ const ASSIGNMENTS: Assignment[] = [
   a(KITCHEN, '2026-10-28', null, 'at', 'Confirm final headcount and dietary restrictions with coordinator'),
   a(KITCHEN, '2026-10-28', '18:00', 'at', 'Cocktail hour – appetizers for 42', 'Vegetarian and GF options on the tray'),
   a(KITCHEN, '2026-10-28', '19:30', 'at', 'Welcome dinner service', '3 vegetarian plates, 1 GF'),
-  a(KITCHEN, '2026-10-29', '08:00', 'by', 'Breakfast buffet ready', 'Coffee, eggs, fruit, pastries'),
+  // Repeat group: breakfast buffet all 3 days
+  a(KITCHEN, '2026-10-28', '07:00', 'by', 'Breakfast buffet set up', 'Coffee, eggs, fruit, pastries', KITCHEN_BFAST_GRP),
+  a(KITCHEN, '2026-10-29', '07:00', 'by', 'Breakfast buffet set up', 'Coffee, eggs, fruit, pastries', KITCHEN_BFAST_GRP),
+  a(KITCHEN, '2026-10-30', '07:00', 'by', 'Breakfast buffet set up', 'Coffee, eggs, fruit, pastries', KITCHEN_BFAST_GRP),
   a(KITCHEN, '2026-10-29', '12:00', 'by', 'BBQ lunch ready at patio', 'Keep warm until 14:00'),
   a(KITCHEN, '2026-10-29', '18:00', 'at', 'Awards dinner – plated service'),
-  a(KITCHEN, '2026-10-30', '07:15', 'by', 'Continental breakfast set up'),
   // Corral
   a(CORRAL, '2026-10-28', null, 'at', 'Assign horses – 42 riders, note skill levels from pre-survey'),
   a(CORRAL, '2026-10-28', '15:30', 'by', 'Group 1 horses tacked and ready', '21 riders'),
@@ -112,9 +121,11 @@ const ASSIGNMENTS: Assignment[] = [
   a(ACTIVITIES, '2026-10-29', null, 'at', 'Prepare all team challenge equipment and station instructions'),
   a(ACTIVITIES, '2026-10-29', '09:30', 'by', 'Staff positioned at activity field for 10:00 start'),
   a(ACTIVITIES, '2026-10-29', '13:30', 'at', 'Tally scores for awards ceremony'),
-  // Housekeeping
+  // Housekeeping — repeat group all 3 days
   a(HOUSEKEEPING, '2026-10-28', '13:00', 'by', 'All guest rooms ready for 14:00 check-in'),
-  a(HOUSEKEEPING, '2026-10-29', '09:00', 'by', 'Common areas cleaned after breakfast'),
+  a(HOUSEKEEPING, '2026-10-28', '08:00', 'by', 'Clean common areas and restock supplies', undefined, HK_CLEAN_GRP),
+  a(HOUSEKEEPING, '2026-10-29', '08:00', 'by', 'Clean common areas and restock supplies', undefined, HK_CLEAN_GRP),
+  a(HOUSEKEEPING, '2026-10-30', '08:00', 'by', 'Clean common areas and restock supplies', undefined, HK_CLEAN_GRP),
   a(HOUSEKEEPING, '2026-10-30', '10:00', 'at', 'Begin turnover of all guest rooms'),
   // Front Desk
   a(FRONTDESK, '2026-10-28', '13:30', 'by', 'Check-in packets ready – room keys, itinerary, ranch map'),
@@ -171,6 +182,28 @@ async function main() {
     assignmentsByDept={assignByDept}
     fromDate="2026-10-28"
     toDate="2026-10-30"
+  />)
+
+  // Multi-dept combined sheet (Kitchen + Housekeeping)
+  await gen('multi-dept-combined', <MultiDeptSheetPDF
+    event={EVENT}
+    departments={[KITCHEN, HOUSEKEEPING]}
+    assignments={ASSIGNMENTS}
+    scheduleItems={SCHEDULE}
+    notes={[]}
+    updatedByName="T Mac"
+    layout="combined"
+  />)
+
+  // Multi-dept paged (Set-Up + Corral + Front Desk)
+  await gen('multi-dept-paged', <MultiDeptSheetPDF
+    event={EVENT}
+    departments={[SETUP, CORRAL, FRONTDESK]}
+    assignments={ASSIGNMENTS}
+    scheduleItems={SCHEDULE}
+    notes={[]}
+    updatedByName="T Mac"
+    layout="paged"
   />)
 
   console.log('Done.')

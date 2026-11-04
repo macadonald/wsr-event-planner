@@ -1,8 +1,7 @@
 import React from 'react'
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { Assignment, Department } from '@/lib/types'
-import { formatDate } from '@/lib/time'
-import { C, T, SP, bandColor, tint, taskTimeLabel } from './shared'
+import { C, T, SP, bandColor, tint, taskTimeLabel, pdfDateShort } from './shared'
 
 const s = StyleSheet.create({
   page: {
@@ -66,7 +65,7 @@ function DeptPage({ department, assignments, fromDate, toDate }: SingleDeptProps
   const band = bandColor(department.color)
   const rowTint = tint(department.color, 0.08)
 
-  const dateRange = fromDate === toDate ? formatDate(fromDate) : `${formatDate(fromDate)} – ${formatDate(toDate)}`
+  const dateRange = fromDate === toDate ? pdfDateShort(fromDate) : `${pdfDateShort(fromDate)} – ${pdfDateShort(toDate)}`
 
   // Group by date
   const byDate = new Map<string, RunSheetAssignment[]>()
@@ -81,8 +80,7 @@ function DeptPage({ department, assignments, fromDate, toDate }: SingleDeptProps
       {/* Header */}
       <View style={s.headerWrap}>
         <View>
-          <Text style={s.brandName}>WSR Events</Text>
-          <Text style={s.brandSub}>White Stallion Ranch</Text>
+          <Text style={s.brandName}>White Stallion Ranch</Text>
         </View>
         <View style={s.titleBlock}>
           <Text style={[s.sheetTitle, { color: band }]}>{department.name.toUpperCase()}</Text>
@@ -104,7 +102,7 @@ function DeptPage({ department, assignments, fromDate, toDate }: SingleDeptProps
           <View key={date} style={s.daySec} wrap={false}>
             {/* Day header band */}
             <View style={[s.dayBand, { backgroundColor: band }]}>
-              <Text style={s.dayBandText}>{formatDate(date).toUpperCase()}</Text>
+              <Text style={s.dayBandText}>{pdfDateShort(date)}</Text>
             </View>
 
             {allRows.map((a, i) => {
@@ -112,7 +110,7 @@ function DeptPage({ department, assignments, fromDate, toDate }: SingleDeptProps
               const isUntimed = !a.task_time
               const metaParts = [a.event_name]
               if (a.event_location) metaParts.push(a.event_location)
-              if (a.event_pax != null) metaParts.push(`${a.event_pax} pax`)
+              if (a.event_pax != null && a.event_pax > 0) metaParts.push(`${a.event_pax} pax`)
               if (a.notes) metaParts.push(a.notes)
 
               return (

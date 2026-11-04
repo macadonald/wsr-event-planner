@@ -103,3 +103,36 @@ export function taskTimeLabel(taskTime: string | null, timeType: TimeType): stri
 export function slugify(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
+
+// "THU 11/5" — compact weekday+date for PDF section headers
+export function pdfDateShort(date: string): string {
+  const [y, m, d] = date.split('-').map(Number)
+  const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' })
+    .format(new Date(Date.UTC(y, m - 1, d)))
+  return `${wd.toUpperCase()}  ${m}/${d}`
+}
+
+// "Wed–Fri 11/4–11/6" (consecutive) or "Wed 11/4, Fri 11/6" (non-consecutive)
+export function formatCollapsedDates(dates: string[]): string {
+  if (dates.length === 0) return ''
+  if (dates.length === 1) return pdfDateShort(dates[0])
+  const sorted = [...dates].sort()
+  let consecutive = true
+  for (let i = 1; i < sorted.length; i++) {
+    const [py, pm, pd] = sorted[i - 1].split('-').map(Number)
+    const [cy, cm, cd] = sorted[i].split('-').map(Number)
+    if (Date.UTC(cy, cm - 1, cd) - Date.UTC(py, pm - 1, pd) !== 86400000) { consecutive = false; break }
+  }
+  if (consecutive) {
+    const [fy, fm, fd] = sorted[0].split('-').map(Number)
+    const [ly, lm, ld] = sorted[sorted.length - 1].split('-').map(Number)
+    const fWd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(fy, fm - 1, fd)))
+    const lWd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(ly, lm - 1, ld)))
+    return `${fWd}–${lWd}  ${fm}/${fd}–${lm}/${ld}`
+  }
+  return sorted.map(d2 => {
+    const [y2, m2, day] = d2.split('-').map(Number)
+    const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(y2, m2 - 1, day)))
+    return `${wd} ${m2}/${day}`
+  }).join(', ')
+}

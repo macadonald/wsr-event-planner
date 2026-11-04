@@ -3,7 +3,7 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { Assignment, Department, Event, EventBilling, EventNote, ScheduleItem } from '@/lib/types'
 import { formatDate, formatTime, formatTimestamp } from '@/lib/time'
 import { getDayCount, formatDateRange, shiftDate } from '@/lib/events'
-import { sortDeptsByPdfOrder, bandColor, tint, C, T, SP } from './shared'
+import { sortDeptsByPdfOrder, bandColor, tint, pdfDateShort, formatCollapsedDates, C, T, SP } from './shared'
 
 // ── styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
@@ -28,7 +28,6 @@ const s = StyleSheet.create({
   },
   brandBlock: { gap: 1 },
   brandName: { fontFamily: 'Helvetica-Bold', fontSize: T.brandName, color: C.brown },
-  brandSub: { fontSize: T.small, color: C.label },
   eventBlock: { alignItems: 'flex-end', gap: 2 },
   eventName: { fontFamily: 'Helvetica-Bold', fontSize: T.eventName, color: C.brown },
   eventMeta: { fontSize: T.small, color: C.brownMid },
@@ -46,7 +45,7 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
 
-  // Info strip (3 columns)
+  // Info strip (2 or 3 columns)
   infoStrip: {
     flexDirection: 'row',
     paddingVertical: 5,
@@ -88,6 +87,14 @@ const s = StyleSheet.create({
     paddingVertical: 3,
   },
   deptBandName: { fontFamily: 'Helvetica-Bold', fontSize: T.small, color: C.white },
+  taskDateHead: {
+    fontFamily: 'Helvetica-Bold',
+    fontSize: T.note,
+    color: C.label,
+    paddingHorizontal: SP.cellPadH,
+    paddingVertical: 2,
+    backgroundColor: C.stripeOdd,
+  },
   taskRow: { flexDirection: 'row', paddingHorizontal: SP.cellPadH, paddingVertical: SP.rowPadV },
   taskTimeCol: { width: SP.timeColW, flexShrink: 0 },
   taskTimeText: { fontSize: T.small, color: C.label },
@@ -111,36 +118,129 @@ function Rule() {
   return <View style={s.rule} />
 }
 
+type CollapsedRow = {
+  id: string
+  task: string
+  task_time: string | null
+  time_type: 'at' | 'by'
+  notes: string | null
+  dateRange: string
+}
+
 function DeptBlock({ dept, assignments }: { dept: Department; assignments: Assignment[] }) {
-  const untimed = assignments.filter(a => !a.task_time)
-  const timed = assignments.filter(a => a.task_time).sort((a, b) => (a.task_time! > b.task_time! ? 1 : -1))
-  const allRows = [...untimed, ...timed]
   const band = bandColor(dept.color)
   const rowTint = tint(dept.color, 0.08)
+
+  // Find collapsible repeat groups (same task + time + time_type across all siblings)
+  const groupMap = new Map<string, Assignment[]>()
+  for (const a of assignments) {
+    if (a.repeat_group_id) {
+      if (!groupMap.has(a.repeat_group_id)) groupMap.set(a.repeat_group_id, [])
+      groupMap.get(a.repeat_group_id)!.push(a)
+    }
+  }
+
+  const collapsibleIds = new Set<string>()
+  const collapsedRows: CollapsedRow[] = []
+
+  for (const [gid, group] of Array.from(groupMap.entries())) {
+    const sorted = [...group].sort((a, b) => a.task_date.localeCompare(b.task_date))
+    const first = sorted[0]
+    const allSame = sorted.every(a => a.task === first.task && a.task_time === first.task_time && a.time_type === first.time_type)
+    if (allSame) {
+      collapsibleIds.add(gid)
+      collapsedRows.push({
+        id: first.id,
+        task: first.task,
+        task_time: first.task_time,
+        time_type: first.time_type,
+        notes: first.notes,
+        dateRange: formatCollapsedDates(sorted.map(a => a.task_date)),
+      })
+    }
+  }
+
+  // Sort collapsed rows: untimed first, then by time
+  collapsedRows.sort((a, b) => {
+    if (!a.task_time && !b.task_time) return 0
+    if (!a.task_time) return -1
+    if (!b.task_time) return 1
+    return a.task_time.localeCompare(b.task_time)
+  })
+
+  // Per-date groups, excluding collapsible repeat tasks
+  const individual = assignments.filter(a => !a.repeat_group_id || !collapsibleIds.has(a.repeat_group_id))
+  const byDate = new Map<string, Assignment[]>()
+  for (const a of individual) {
+    if (!byDate.has(a.task_date)) byDate.set(a.task_date, [])
+    byDate.get(a.task_date)!.push(a)
+  }
+  const dates = Array.from(byDate.keys()).sort()
+
+  let rowIdx = 0
 
   return (
     <View style={s.deptBlock}>
       <View style={[s.deptBand, { backgroundColor: band }]}>
         <Text style={s.deptBandName}>{dept.name.toUpperCase()}</Text>
       </View>
-      {allRows.map((a, i) => {
-        const isUntimed = !a.task_time
-        const bg = i % 2 === 0 ? C.white : rowTint
+
+      {/* Collapsed repeat rows */}
+      {collapsedRows.map(cr => {
+        const bg = rowIdx++ % 2 === 0 ? C.white : rowTint
         return (
-          <View key={a.id} style={[s.taskRow, { backgroundColor: bg }]}>
+          <View key={cr.id} style={[s.taskRow, { backgroundColor: bg }]}>
             <View style={s.taskTimeCol}>
-              {isUntimed ? (
-                <Text style={s.taskTimeText}>General</Text>
-              ) : (
+              <Text style={[s.taskTimeText, { fontSize: T.note, lineHeight: 1.2 }]}>{cr.dateRange}</Text>
+              {cr.task_time ? (
                 <Text style={s.taskTimeText}>
-                  <Text style={s.taskTimeBold}>{a.time_type === 'by' ? 'By ' : 'At '}</Text>
-                  {formatTime(a.task_time!)}
+                  <Text style={s.taskTimeBold}>{cr.time_type === 'by' ? 'By ' : 'At '}</Text>
+                  {formatTime(cr.task_time)}
                 </Text>
+              ) : (
+                <Text style={s.taskTimeText}>General</Text>
               )}
             </View>
             <View style={s.taskBody}>
-              <Text style={s.taskText}>{a.task}</Text>
+              <Text style={s.taskText}>{cr.task}</Text>
+              {cr.notes && <Text style={s.taskNote}>{cr.notes}</Text>}
             </View>
+          </View>
+        )
+      })}
+
+      {/* Per-date groups */}
+      {dates.map(date => {
+        const items = byDate.get(date)!
+        const untimed = items.filter(a => !a.task_time)
+        const timed = items.filter(a => a.task_time).sort((a, b) => (a.task_time! > b.task_time! ? 1 : -1))
+        return (
+          <View key={date}>
+            <View style={s.taskDateHead}>
+              <Text>{pdfDateShort(date)}</Text>
+            </View>
+            {[...untimed, ...timed].map(a => {
+              const bg = rowIdx++ % 2 === 0 ? C.white : rowTint
+              const isUntimed = !a.task_time
+              return (
+                <View key={a.id} style={[s.taskRow, { backgroundColor: bg }]}>
+                  <View style={s.taskTimeCol}>
+                    {isUntimed ? (
+                      <Text style={s.taskTimeText}>General</Text>
+                    ) : (
+                      <Text style={s.taskTimeText}>
+                        <Text style={s.taskTimeBold}>{a.time_type === 'by' ? 'By ' : 'At '}</Text>
+                        {formatTime(a.task_time!)}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={s.taskBody}>
+                    <Text style={s.taskText}>{a.task}</Text>
+                    {a.notes && <Text style={s.taskNote}>{a.notes}</Text>}
+                  </View>
+                </View>
+              )
+            })}
           </View>
         )
       })}
@@ -164,11 +264,11 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
   const dayCount = getDayCount(event.start_date, event.end_date)
   const dateRange = formatDateRange(event.start_date, event.end_date)
 
-  // Meta line: dates · days · type · pax
+  // Meta line: dates · days · type · pax (hide pax if null or 0)
   const metaParts: string[] = [dateRange]
   if (dayCount > 1) metaParts.push(`${dayCount} days`)
   if (event.event_type) metaParts.push(event.event_type)
-  if (event.pax != null) metaParts.push(`${event.pax} guests`)
+  if (event.pax != null && event.pax > 0) metaParts.push(`${event.pax} guests`)
 
   // Schedule: days with items
   const allDays = Array.from({ length: dayCount }, (_, i) => shiftDate(event.start_date, i))
@@ -211,8 +311,7 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
         {/* ── Header ── */}
         <View style={s.headerWrap}>
           <View style={s.brandBlock}>
-            <Text style={s.brandName}>WSR Events</Text>
-            <Text style={s.brandSub}>White Stallion Ranch</Text>
+            <Text style={s.brandName}>White Stallion Ranch</Text>
           </View>
           <View style={s.eventBlock}>
             <Text style={s.eventName}>{event.name}</Text>
@@ -243,7 +342,7 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
           <View style={s.infoCol}>
             <Text style={s.secLabel}>EVENT DETAILS</Text>
             {event.location && <Text style={s.infoVal}>{event.location}</Text>}
-            {event.pax != null && <Text style={s.infoSm}>{event.pax} guests</Text>}
+            {event.pax != null && event.pax > 0 && <Text style={s.infoSm}>{event.pax} guests</Text>}
             {(event.start_time || event.end_time) && (
               <Text style={s.infoSm}>
                 {event.start_time ? formatTime(event.start_time) : ''}
@@ -254,8 +353,8 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
             {event.description && <Text style={s.infoSm}>{event.description}</Text>}
           </View>
 
-          {/* Billing or spacer */}
-          {hasBillingData ? (
+          {/* Billing column — only if there is billing data */}
+          {hasBillingData && (
             <>
               <View style={s.infoDivider} />
               <View style={s.infoCol}>
@@ -268,11 +367,6 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
                 {billing!.package && <Text style={s.infoSm}>{billing!.package}</Text>}
                 {billing!.notes && <Text style={s.infoSm}>{billing!.notes}</Text>}
               </View>
-            </>
-          ) : (
-            <>
-              <View style={s.infoDivider} />
-              <View style={s.infoCol} />
             </>
           )}
         </View>
@@ -287,7 +381,7 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
                   const items = schedByDate.get(date) ?? []
                   return (
                     <View key={date} style={s.dayCol}>
-                      <Text style={s.dayHead}>{formatDate(date).toUpperCase()}</Text>
+                      <Text style={s.dayHead}>{pdfDateShort(date)}</Text>
                       {items.map(item => (
                         <View key={item.id} style={s.schedRow}>
                           <Text style={s.schedTime}>

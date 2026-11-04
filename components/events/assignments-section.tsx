@@ -49,10 +49,10 @@ type RowProps = {
   departments: Department[]
   canEdit: boolean
   eventId: string
-  groupSize: number   // how many siblings share the same repeat_group_id
+  siblingDates: string[]  // other dates in same repeat group (sorted)
 }
 
-function AssignmentRow({ assignment, department, departments, canEdit, eventId, groupSize }: RowProps) {
+function AssignmentRow({ assignment, department, departments, canEdit, eventId, siblingDates }: RowProps) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [editing, setEditing] = useState(false)
@@ -85,9 +85,10 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
   }
 
   async function handleDelete() {
-    if (assignment.repeat_group_id && groupSize > 1) {
+    if (assignment.repeat_group_id && siblingDates.length > 0) {
+      const totalDays = siblingDates.length + 1
       const choice = confirm(
-        `This task repeats across ${groupSize} days.\n\nClick OK to delete all ${groupSize} days, or Cancel to delete this day only.`
+        `This task repeats across ${totalDays} days.\n\nOK = delete all ${totalDays} days\nCancel = delete this day only`
       )
       if (choice) {
         await deleteAssignmentGroup(assignment.repeat_group_id, eventId)
@@ -190,8 +191,10 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
             {assignment.notes}
           </p>
         )}
-        {assignment.repeat_group_id && groupSize > 1 && (
-          <p className="text-xs text-brown-300 mt-0.5">↻ {groupSize}-day group</p>
+        {siblingDates.length > 0 && (
+          <p className="text-xs text-brown-300 mt-0.5">
+            ↻ also {siblingDates.map(d => formatDateShortWithDay(d)).join(', ')}
+          </p>
         )}
       </div>
       {canEdit && (
@@ -266,10 +269,20 @@ export default function AssignmentsSection({ event, assignments, departments, ca
   // dept lookup map
   const deptMap = new Map(departments.map(d => [d.id, d]))
 
-  // repeat group size map: groupId → count
-  const groupSizes = new Map<string, number>()
+  // Build sibling dates map: assignment.id → sorted list of other dates in same repeat group
+  const groupDates = new Map<string, string[]>()
   for (const a of assignments) {
-    if (a.repeat_group_id) groupSizes.set(a.repeat_group_id, (groupSizes.get(a.repeat_group_id) ?? 0) + 1)
+    if (a.repeat_group_id) {
+      if (!groupDates.has(a.repeat_group_id)) groupDates.set(a.repeat_group_id, [])
+      groupDates.get(a.repeat_group_id)!.push(a.task_date)
+    }
+  }
+  const siblingDates = new Map<string, string[]>()
+  for (const a of assignments) {
+    if (a.repeat_group_id) {
+      const all = groupDates.get(a.repeat_group_id) ?? []
+      siblingDates.set(a.id, all.filter(d => d !== a.task_date).sort())
+    }
   }
 
   // apply department filter
@@ -294,8 +307,14 @@ export default function AssignmentsSection({ event, assignments, departments, ca
 
     return entries.map(([deptId, items]) => {
       const dept = deptMap.get(deptId)
-      const untimed = items.filter(a => !a.task_time)
-      const timed = items.filter(a => a.task_time).sort((a, b) => (a.task_time! > b.task_time! ? 1 : -1))
+
+      // Group by date within dept
+      const byDate = new Map<string, Assignment[]>()
+      for (const a of items) {
+        if (!byDate.has(a.task_date)) byDate.set(a.task_date, [])
+        byDate.get(a.task_date)!.push(a)
+      }
+      const dates = Array.from(byDate.keys()).sort()
 
       return (
         <div key={deptId} className="space-y-1">
@@ -303,21 +322,27 @@ export default function AssignmentsSection({ event, assignments, departments, ca
             <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: dept?.color ?? '#888' }} />
             <p className="text-xs font-semibold text-brown-600">{dept?.name ?? 'Unknown'}</p>
           </div>
-          <div className="pl-4 space-y-0.5">
-            {untimed.length > 0 && (
-              <>
-                <p className="text-xs text-brown-300 mt-1 mb-0.5">General</p>
-                {untimed.map(a => (
-                  <AssignmentRow key={a.id} assignment={a} department={dept} departments={departments} canEdit={canEdit} eventId={event.id} groupSize={a.repeat_group_id ? (groupSizes.get(a.repeat_group_id) ?? 1) : 1} />
-                ))}
-              </>
-            )}
-            {timed.map(a => {
-              const timeLabel = formatAssignmentTime(a.task_time, a.time_type)!
+          <div className="pl-4 space-y-2">
+            {dates.map(date => {
+              const dateItems = byDate.get(date)!
+              const untimed = dateItems.filter(a => !a.task_time)
+              const timed = dateItems.filter(a => a.task_time).sort((a, b) => (a.task_time! > b.task_time! ? 1 : -1))
               return (
-                <div key={a.id}>
-                  <p className="text-xs text-brown-300 mt-1 mb-0.5">{timeLabel}</p>
-                  <AssignmentRow assignment={a} department={dept} departments={departments} canEdit={canEdit} eventId={event.id} groupSize={a.repeat_group_id ? (groupSizes.get(a.repeat_group_id) ?? 1) : 1} />
+                <div key={date}>
+                  <p className="text-xs font-medium text-brown-400 mt-1 mb-0.5">{formatDateShortWithDay(date)}</p>
+                  <div className="space-y-0.5">
+                    {[...untimed, ...timed].map(a => (
+                      <AssignmentRow
+                        key={a.id}
+                        assignment={a}
+                        department={dept}
+                        departments={departments}
+                        canEdit={canEdit}
+                        eventId={event.id}
+                        siblingDates={siblingDates.get(a.id) ?? []}
+                      />
+                    ))}
+                  </div>
                 </div>
               )
             })}
@@ -350,7 +375,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
               <>
                 <p className="text-xs text-brown-300 mt-0.5 mb-0.5">General</p>
                 {untimed.map(a => (
-                  <AssignmentRow key={a.id} assignment={a} department={deptMap.get(a.department_id)} departments={departments} canEdit={canEdit} eventId={event.id} groupSize={a.repeat_group_id ? (groupSizes.get(a.repeat_group_id) ?? 1) : 1} />
+                  <AssignmentRow key={a.id} assignment={a} department={deptMap.get(a.department_id)} departments={departments} canEdit={canEdit} eventId={event.id} siblingDates={siblingDates.get(a.id) ?? []} />
                 ))}
               </>
             )}
@@ -359,7 +384,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
               return (
                 <div key={a.id}>
                   <p className="text-xs text-brown-300 mt-1 mb-0.5">{timeLabel}</p>
-                  <AssignmentRow assignment={a} department={deptMap.get(a.department_id)} departments={departments} canEdit={canEdit} eventId={event.id} groupSize={a.repeat_group_id ? (groupSizes.get(a.repeat_group_id) ?? 1) : 1} />
+                  <AssignmentRow assignment={a} department={deptMap.get(a.department_id)} departments={departments} canEdit={canEdit} eventId={event.id} siblingDates={siblingDates.get(a.id) ?? []} />
                 </div>
               )
             })}

@@ -1,9 +1,9 @@
 import React from 'react'
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer'
 import type { Assignment, Department, Event, EventNote, ScheduleItem } from '@/lib/types'
-import { formatDate, formatTime, formatTimestamp } from '@/lib/time'
+import { formatTime, formatTimestamp } from '@/lib/time'
 import { getDayCount, formatDateRange } from '@/lib/events'
-import { bandColor, tint, C, T, SP } from './shared'
+import { bandColor, tint, pdfDateShort, formatCollapsedDates, C, T, SP } from './shared'
 
 const s = StyleSheet.create({
   page: {
@@ -26,7 +26,6 @@ const s = StyleSheet.create({
     borderBottomColor: C.border,
   },
   brandName: { fontFamily: 'Helvetica-Bold', fontSize: T.brandName, color: C.brown },
-  brandSub: { fontSize: T.small, color: C.label, marginTop: 1 },
   headerRight: { alignItems: 'flex-end', gap: 2 },
   deptTitle: { fontFamily: 'Helvetica-Bold', fontSize: T.eventName, color: C.brown },
   eventLine: { fontSize: T.small, color: C.brownMid },
@@ -112,18 +111,65 @@ export function DepartmentSheetPDF({ event, department, scheduleItems, assignmen
   }
   const scheduleDates = Array.from(schedByDate.keys()).sort()
 
-  // Assignments for this department only, grouped by date
+  // Dept assignments — find collapsible repeat groups
   const deptAssignments = assignments.filter(a => a.department_id === department.id)
-  const assignByDate = new Map<string, Assignment[]>()
+
+  const groupMap = new Map<string, Assignment[]>()
   for (const a of deptAssignments) {
+    if (a.repeat_group_id) {
+      if (!groupMap.has(a.repeat_group_id)) groupMap.set(a.repeat_group_id, [])
+      groupMap.get(a.repeat_group_id)!.push(a)
+    }
+  }
+
+  type CollapsedRow = { id: string; task: string; task_time: string | null; time_type: 'at' | 'by'; notes: string | null; dateRange: string }
+  const collapsibleIds = new Set<string>()
+  const collapsedRows: CollapsedRow[] = []
+
+  for (const [gid, group] of Array.from(groupMap.entries())) {
+    const sorted = [...group].sort((a, b) => a.task_date.localeCompare(b.task_date))
+    const first = sorted[0]
+    const allSame = sorted.every(a => a.task === first.task && a.task_time === first.task_time && a.time_type === first.time_type)
+    if (allSame) {
+      collapsibleIds.add(gid)
+      collapsedRows.push({
+        id: first.id,
+        task: first.task,
+        task_time: first.task_time,
+        time_type: first.time_type,
+        notes: first.notes,
+        dateRange: formatCollapsedDates(sorted.map(a => a.task_date)),
+      })
+    }
+  }
+
+  collapsedRows.sort((a, b) => {
+    if (!a.task_time && !b.task_time) return 0
+    if (!a.task_time) return -1
+    if (!b.task_time) return 1
+    return a.task_time.localeCompare(b.task_time)
+  })
+
+  // Per-date groups, excluding collapsible repeat tasks
+  const individual = deptAssignments.filter(a => !a.repeat_group_id || !collapsibleIds.has(a.repeat_group_id))
+  const assignByDate = new Map<string, Assignment[]>()
+  for (const a of individual) {
     if (!assignByDate.has(a.task_date)) assignByDate.set(a.task_date, [])
     assignByDate.get(a.task_date)!.push(a)
   }
   const assignDates = Array.from(assignByDate.keys()).sort()
 
-  // All task rows flattened (for zebra striping)
-  type FlatRow = { type: 'dateHead'; date: string } | { type: 'task'; assignment: Assignment }
+  type FlatRow =
+    | { type: 'collapsed'; row: CollapsedRow }
+    | { type: 'dateHead'; date: string }
+    | { type: 'task'; assignment: Assignment }
+
   const flatRows: FlatRow[] = []
+
+  // Collapsed rows first
+  for (const cr of collapsedRows) flatRows.push({ type: 'collapsed', row: cr })
+
+  // Per-date individual rows
   for (const date of assignDates) {
     flatRows.push({ type: 'dateHead', date })
     const items = assignByDate.get(date)!
@@ -141,8 +187,7 @@ export function DepartmentSheetPDF({ event, department, scheduleItems, assignmen
         {/* Header */}
         <View style={s.headerWrap}>
           <View>
-            <Text style={s.brandName}>WSR Events</Text>
-            <Text style={s.brandSub}>White Stallion Ranch</Text>
+            <Text style={s.brandName}>White Stallion Ranch</Text>
           </View>
           <View style={s.headerRight}>
             <Text style={[s.deptTitle, { color: band }]}>{department.name}</Text>
@@ -155,7 +200,7 @@ export function DepartmentSheetPDF({ event, department, scheduleItems, assignmen
 
         {/* Event summary bar */}
         <View style={s.summaryBar}>
-          {event.pax != null && (
+          {event.pax != null && event.pax > 0 && (
             <View style={s.sumItem}>
               <Text style={s.sumLabel}>Guests</Text>
               <Text style={s.sumVal}>{event.pax}</Text>
@@ -187,7 +232,7 @@ export function DepartmentSheetPDF({ event, department, scheduleItems, assignmen
             <Text style={s.secLabel}>FULL SCHEDULE</Text>
             {scheduleDates.map(date => (
               <View key={date} style={{ marginBottom: 5 }}>
-                <Text style={s.dayHead}>{formatDate(date).toUpperCase()}</Text>
+                <Text style={s.dayHead}>{pdfDateShort(date)}</Text>
                 {(schedByDate.get(date) ?? []).map(item => (
                   <View key={item.id} style={s.schedRow}>
                     <Text style={s.schedTime}>{item.start_time ? formatTime(item.start_time) : ''}</Text>
@@ -226,9 +271,30 @@ export function DepartmentSheetPDF({ event, department, scheduleItems, assignmen
             if (row.type === 'dateHead') {
               return (
                 <View key={`dh-${row.date}`} style={s.taskDateHead}>
-                  <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: T.small, color: C.brownMid }}>
-                    {formatDate(row.date).toUpperCase()}
-                  </Text>
+                  <Text>{pdfDateShort(row.date)}</Text>
+                </View>
+              )
+            }
+            if (row.type === 'collapsed') {
+              const cr = row.row
+              const bg = taskRowIdx++ % 2 === 0 ? C.white : rowTint
+              return (
+                <View key={`cr-${cr.id}`} style={[s.taskRow, { backgroundColor: bg }]}>
+                  <View style={s.taskTimeCol}>
+                    <Text style={[s.taskTimeText, { fontSize: T.note, lineHeight: 1.2 }]}>{cr.dateRange}</Text>
+                    {cr.task_time ? (
+                      <Text style={s.taskTimeText}>
+                        <Text style={s.taskTimeBold}>{cr.time_type === 'by' ? 'By ' : 'At '}</Text>
+                        {formatTime(cr.task_time)}
+                      </Text>
+                    ) : (
+                      <Text style={s.taskTimeText}>General</Text>
+                    )}
+                  </View>
+                  <View style={s.taskBody}>
+                    <Text style={s.taskText}>{cr.task}</Text>
+                    {cr.notes && <Text style={s.taskNote}>{cr.notes}</Text>}
+                  </View>
                 </View>
               )
             }
