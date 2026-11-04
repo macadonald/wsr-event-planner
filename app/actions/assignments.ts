@@ -104,6 +104,23 @@ export async function updateAssignment(
   return { error: null }
 }
 
+export async function updateAssignmentGroup(
+  repeatGroupId: string,
+  eventId: string,
+  data: Partial<AssignmentFormData>,
+): Promise<{ error: string | null }> {
+  const ctx = await guardPlanner()
+  if (!ctx) return { error: 'Unauthorized' }
+
+  const { error } = await ctx.supabase
+    .from('assignments')
+    .update({ ...data, updated_by: ctx.userId })
+    .eq('repeat_group_id', repeatGroupId)
+  if (error) return { error: error.message }
+  revalidatePath(`/events/${eventId}`)
+  return { error: null }
+}
+
 export async function deleteAssignment(
   id: string,
   eventId: string,

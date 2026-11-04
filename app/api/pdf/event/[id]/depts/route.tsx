@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
 import { MultiDeptSheetPDF } from '@/lib/pdf/multi-dept-sheet'
+import { RanchLedgerMultiDeptSheetPDF } from '@/lib/pdf/ranch-ledger-dept'
 import type { Assignment, Department, Event, EventNote, ScheduleItem } from '@/lib/types'
 import { sortDeptsByPdfOrder, slugify } from '@/lib/pdf/shared'
 
@@ -22,6 +23,7 @@ export async function GET(
   const { searchParams } = new URL(req.url)
   const deptsParam = searchParams.get('depts') ?? ''
   const layout = (searchParams.get('layout') ?? 'paged') as 'paged' | 'combined'
+  const style = searchParams.get('style') === 'classic' ? 'classic' : 'ledger'
 
   const selectedIds = deptsParam ? deptsParam.split(',').filter(Boolean) : []
 
@@ -53,16 +55,22 @@ export async function GET(
     ? allDepts.filter(d => selectedIds.includes(d.id))
     : allDepts.filter(d => (assignmentData ?? []).some((a: Assignment) => a.department_id === d.id))
 
+  const sharedProps = {
+    event: eventData as Event,
+    departments,
+    assignments: (assignmentData ?? []) as Assignment[],
+    scheduleItems: (scheduleData ?? []) as ScheduleItem[],
+    notes: (notesData ?? []) as EventNote[],
+    updatedByName,
+    layout,
+  }
+
   type PdfArg = Parameters<typeof renderToBuffer>[0]
-  const buffer = await renderToBuffer(<MultiDeptSheetPDF
-    event={eventData as Event}
-    departments={departments}
-    assignments={(assignmentData ?? []) as Assignment[]}
-    scheduleItems={(scheduleData ?? []) as ScheduleItem[]}
-    notes={(notesData ?? []) as EventNote[]}
-    updatedByName={updatedByName}
-    layout={layout}
-  /> as unknown as PdfArg)
+  const element = style === 'classic'
+    ? <MultiDeptSheetPDF {...sharedProps} />
+    : <RanchLedgerMultiDeptSheetPDF {...sharedProps} />
+
+  const buffer = await renderToBuffer(element as unknown as PdfArg)
 
   const filename = `dept-sheets-${slugify(eventData.name)}.pdf`
   return new Response(new Uint8Array(buffer), {

@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
 import { RunSheetPDF } from '@/lib/pdf/run-sheet'
+import { RanchLedgerRunSheetPDF } from '@/lib/pdf/ranch-ledger-run'
 import type { RunSheetAssignment } from '@/lib/pdf/run-sheet'
 import type { Assignment, Department } from '@/lib/types'
 import { sortDeptsByPdfOrder } from '@/lib/pdf/shared'
@@ -21,6 +22,7 @@ export async function GET(req: Request) {
   const deptParam = searchParams.get('dept') ?? 'all'
   const fromDate = searchParams.get('from') ?? ''
   const toDate = searchParams.get('to') ?? ''
+  const style = searchParams.get('style') === 'classic' ? 'classic' : 'ledger'
 
   if (!fromDate || !toDate) return new Response('Missing from/to params', { status: 400 })
 
@@ -65,13 +67,14 @@ export async function GET(req: Request) {
     assignmentsByDept.get(a.department_id)!.push(a)
   }
 
+  const sharedProps = { departments, assignmentsByDept, fromDate, toDate }
+
   type PdfArg = Parameters<typeof renderToBuffer>[0]
-  const buffer = await renderToBuffer(<RunSheetPDF
-    departments={departments}
-    assignmentsByDept={assignmentsByDept}
-    fromDate={fromDate}
-    toDate={toDate}
-  /> as unknown as PdfArg)
+  const element = style === 'classic'
+    ? <RunSheetPDF {...sharedProps} />
+    : <RanchLedgerRunSheetPDF {...sharedProps} />
+
+  const buffer = await renderToBuffer(element as unknown as PdfArg)
 
   const deptLabel = deptParam === 'all'
     ? 'all-depts'

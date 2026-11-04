@@ -268,7 +268,7 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
   const metaParts: string[] = [dateRange]
   if (dayCount > 1) metaParts.push(`${dayCount} days`)
   if (event.event_type) metaParts.push(event.event_type)
-  if (event.pax != null && event.pax > 0) metaParts.push(`${event.pax} guests`)
+  if (event.pax != null) metaParts.push(`${event.pax} guests`)
 
   // Schedule: days with items
   const allDays = Array.from({ length: dayCount }, (_, i) => shiftDate(event.start_date, i))
@@ -342,7 +342,10 @@ export function FullEventPlanPDF({ event, billing, showBilling, scheduleItems, a
           <View style={s.infoCol}>
             <Text style={s.secLabel}>EVENT DETAILS</Text>
             {event.location && <Text style={s.infoVal}>{event.location}</Text>}
-            {event.pax != null && event.pax > 0 && <Text style={s.infoSm}>{event.pax} guests</Text>}
+            {event.pax != null
+              ? <Text style={s.infoSm}>{event.pax} guests</Text>
+              : <Text style={s.infoSm}>Guests: —</Text>
+            }
             {(event.start_time || event.end_time) && (
               <Text style={s.infoSm}>
                 {event.start_time ? formatTime(event.start_time) : ''}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Department } from '@/lib/types'
 import { todayInPhoenix } from '@/lib/time'
 import { shiftDate } from '@/lib/events'
@@ -24,6 +24,17 @@ export default function RunSheetForm({ departments }: { departments: Department[
   const [deptId, setDeptId] = useState('all')
   const [fromDate, setFromDate] = useState(week.from)
   const [toDate, setToDate] = useState(week.to)
+  const [pdfStyle, setPdfStyle] = useState<'classic' | 'ledger'>('ledger')
+
+  useEffect(() => {
+    const stored = localStorage.getItem('wsr-pdf-style')
+    if (stored === 'classic' || stored === 'ledger') setPdfStyle(stored)
+  }, [])
+
+  function handleStyleChange(s: 'classic' | 'ledger') {
+    setPdfStyle(s)
+    localStorage.setItem('wsr-pdf-style', s)
+  }
 
   function setWeek(range: { from: string; to: string }) {
     setFromDate(range.from)
@@ -31,7 +42,7 @@ export default function RunSheetForm({ departments }: { departments: Department[
   }
 
   function generatePdf() {
-    const url = `/api/pdf/run-sheet?dept=${deptId}&from=${fromDate}&to=${toDate}`
+    const url = `/api/pdf/run-sheet?dept=${deptId}&from=${fromDate}&to=${toDate}&style=${pdfStyle}`
     window.open(url, '_blank')
   }
 
@@ -94,12 +105,29 @@ export default function RunSheetForm({ departments }: { departments: Department[
         </div>
       </div>
 
-      <button
-        onClick={generatePdf}
-        className="w-full bg-brown-500 hover:bg-brown-600 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
-      >
-        Generate PDF →
-      </button>
+      <div className="flex items-center justify-between">
+        <div className="flex rounded border border-cream-300 overflow-hidden text-xs">
+          {(['ledger', 'classic'] as const).map(opt => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => handleStyleChange(opt)}
+              className={`px-2 py-1 transition-colors ${
+                pdfStyle === opt ? 'bg-brown-500 text-white' : 'bg-white text-brown-500 hover:bg-cream-50'
+              }`}
+            >
+              {opt === 'ledger' ? 'Ranch Ledger' : 'Classic'}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={generatePdf}
+          className="bg-brown-500 hover:bg-brown-600 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+        >
+          Generate PDF →
+        </button>
+      </div>
 
       <p className="text-xs text-brown-300 text-center">
         Opens in a new tab — use your browser&apos;s print dialog to print or save.

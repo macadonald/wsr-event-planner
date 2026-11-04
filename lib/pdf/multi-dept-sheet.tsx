@@ -217,9 +217,7 @@ function PageHeader({ event, dayCount, dateRange, updatedByName }: { event: Even
 function SummaryBar({ event }: { event: Event }) {
   return (
     <View style={s.summaryBar}>
-      {event.pax != null && event.pax > 0 && (
-        <View style={s.sumItem}><Text style={s.sumLabel}>Guests</Text><Text style={s.sumVal}>{event.pax}</Text></View>
-      )}
+      <View style={s.sumItem}><Text style={s.sumLabel}>Guests</Text><Text style={s.sumVal}>{event.pax != null ? event.pax : '—'}</Text></View>
       {event.location && (
         <View style={s.sumItem}><Text style={s.sumLabel}>Location</Text><Text style={s.sumVal}>{event.location}</Text></View>
       )}

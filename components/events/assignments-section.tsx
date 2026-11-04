@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Assignment, Department, Event, TimeType } from '@/lib/types'
-import { createAssignments, updateAssignment, deleteAssignment, deleteAssignmentGroup } from '@/app/actions/assignments'
+import { createAssignments, updateAssignment, updateAssignmentGroup, deleteAssignment, deleteAssignmentGroup } from '@/app/actions/assignments'
 import type { AssignmentFormData } from '@/app/actions/assignments'
 import { formatDateWithDay, formatDateShortWithDay, formatTime } from '@/lib/time'
 import { getDayCount, shiftDate } from '@/lib/events'
@@ -57,6 +57,8 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
   const [, startTransition] = useTransition()
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showEditScopeDialog, setShowEditScopeDialog] = useState(false)
   const [form, setForm] = useState<AssignmentFormData>({
     department_id: assignment.department_id,
     task: assignment.task,
@@ -66,39 +68,49 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
     notes: assignment.notes,
   })
 
+  const isRepeat = !!(assignment.repeat_group_id && siblingDates.length > 0)
+  const totalDays = siblingDates.length + 1
+
   function setF<K extends keyof AssignmentFormData>(k: K, v: AssignmentFormData[K]) {
     setForm(f => ({ ...f, [k]: v }))
   }
 
-  async function handleSave() {
+  function handleSaveClick() {
     if (!form.task.trim() || !form.department_id) return
+    if (isRepeat) {
+      setShowEditScopeDialog(true)
+    } else {
+      executeSave('single')
+    }
+  }
+
+  async function executeSave(scope: 'single' | 'all') {
     setSaving(true)
-    await updateAssignment(assignment.id, eventId, {
+    setShowEditScopeDialog(false)
+    const data = {
       ...form,
       task: form.task.trim(),
       notes: form.notes?.trim() || null,
       task_time: form.task_time || null,
-    })
+    }
+    if (scope === 'all' && assignment.repeat_group_id) {
+      const { task, task_time, time_type, notes, department_id } = data
+      await updateAssignmentGroup(assignment.repeat_group_id, eventId, { task, task_time, time_type, notes, department_id })
+    } else {
+      await updateAssignment(assignment.id, eventId, data)
+    }
     setSaving(false)
     setEditing(false)
     startTransition(() => router.refresh())
   }
 
-  async function handleDelete() {
-    if (assignment.repeat_group_id && siblingDates.length > 0) {
-      const totalDays = siblingDates.length + 1
-      const choice = confirm(
-        `This task repeats across ${totalDays} days.\n\nOK = delete all ${totalDays} days\nCancel = delete this day only`
-      )
-      if (choice) {
-        await deleteAssignmentGroup(assignment.repeat_group_id, eventId)
-        startTransition(() => router.refresh())
-        return
-      }
+  async function executeDelete(scope: 'single' | 'all') {
+    setShowDeleteDialog(false)
+    if (scope === 'all' && assignment.repeat_group_id) {
+      await deleteAssignmentGroup(assignment.repeat_group_id, eventId)
     } else {
-      if (!confirm('Remove this assignment?')) return
+      await deleteAssignment(assignment.id, eventId)
     }
-    await deleteAssignment(assignment.id, eventId)
     startTransition(() => router.refresh())
   }
 
@@ -160,57 +172,114 @@ function AssignmentRow({ assignment, department, departments, canEdit, eventId, 
             className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300"
           />
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSave}
-            disabled={saving || !form.task.trim() || !form.department_id}
-            className="bg-brown-500 hover:bg-brown-600 text-white text-xs px-3 py-1 rounded disabled:opacity-50 transition-colors"
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          <button
-            onClick={() => setEditing(false)}
-            className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1"
-          >
-            Cancel
-          </button>
-        </div>
+
+        {showEditScopeDialog ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+            <p className="text-xs text-brown-600">This task repeats across {totalDays} days. Save changes to which?</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => executeSave('single')}
+                disabled={saving}
+                className="text-xs bg-brown-500 hover:bg-brown-600 text-white px-3 py-1.5 rounded disabled:opacity-50 transition-colors"
+              >
+                This day only
+              </button>
+              <button
+                onClick={() => executeSave('all')}
+                disabled={saving}
+                className="text-xs bg-brown-500 hover:bg-brown-600 text-white px-3 py-1.5 rounded disabled:opacity-50 transition-colors"
+              >
+                All {totalDays} days
+              </button>
+              <button
+                onClick={() => setShowEditScopeDialog(false)}
+                className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1.5"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveClick}
+              disabled={saving || !form.task.trim() || !form.department_id}
+              className="bg-brown-500 hover:bg-brown-600 text-white text-xs px-3 py-1 rounded disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="flex items-start gap-2 py-1.5 group">
-      <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: deptColor }} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-brown-700 leading-snug">{assignment.task}</p>
-        {(timeLabel || assignment.notes) && (
-          <p className="text-xs text-brown-400 mt-0.5">
-            {timeLabel}
-            {timeLabel && assignment.notes ? ' · ' : ''}
-            {assignment.notes}
-          </p>
-        )}
-        {siblingDates.length > 0 && (
-          <p className="text-xs text-brown-300 mt-0.5">
-            ↻ also {siblingDates.map(d => formatDateShortWithDay(d)).join(', ')}
-          </p>
+    <div className="space-y-0.5">
+      <div className="flex items-start gap-2 py-1.5 group">
+        <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: deptColor }} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-brown-700 leading-snug">{assignment.task}</p>
+          {(timeLabel || assignment.notes) && (
+            <p className="text-xs text-brown-400 mt-0.5">
+              {timeLabel}
+              {timeLabel && assignment.notes ? ' · ' : ''}
+              {assignment.notes}
+            </p>
+          )}
+          {siblingDates.length > 0 && (
+            <p className="text-xs text-brown-300 mt-0.5">
+              ↻ also {siblingDates.map(d => formatDateShortWithDay(d)).join(', ')}
+            </p>
+          )}
+        </div>
+        {canEdit && (
+          <div className="flex gap-1 shrink-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:transition-opacity">
+            <button
+              onClick={() => setEditing(true)}
+              className="text-xs text-brown-400 hover:text-brown-600 px-1"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => isRepeat ? setShowDeleteDialog(true) : executeDelete('single')}
+              className="text-xs text-red-400 hover:text-red-600 px-1"
+            >
+              ✕
+            </button>
+          </div>
         )}
       </div>
-      {canEdit && (
-        <div className="flex gap-1 shrink-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:transition-opacity">
-          <button
-            onClick={() => setEditing(true)}
-            className="text-xs text-brown-400 hover:text-brown-600 px-1"
-          >
-            Edit
-          </button>
-          <button
-            onClick={handleDelete}
-            className="text-xs text-red-400 hover:text-red-600 px-1"
-          >
-            ✕
-          </button>
+
+      {showDeleteDialog && (
+        <div className="ml-3.5 bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+          <p className="text-xs text-red-700">This task repeats across {totalDays} days. Delete which?</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => executeDelete('single')}
+              className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition-colors"
+            >
+              Delete this day only
+            </button>
+            <button
+              onClick={() => executeDelete('all')}
+              className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition-colors"
+            >
+              Delete all {totalDays} days
+            </button>
+            <button
+              onClick={() => setShowDeleteDialog(false)}
+              className="text-xs text-brown-400 hover:text-brown-600 px-2 py-1.5"
+            >
+              Keep it
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -10,6 +10,9 @@ import { FullEventPlanPDF } from '@/lib/pdf/full-event-plan'
 import { DepartmentSheetPDF } from '@/lib/pdf/department-sheet'
 import { RunSheetPDF } from '@/lib/pdf/run-sheet'
 import { MultiDeptSheetPDF } from '@/lib/pdf/multi-dept-sheet'
+import { RanchLedgerFullEventPlanPDF } from '@/lib/pdf/ranch-ledger-plan'
+import { RanchLedgerDeptSheetPDF, RanchLedgerMultiDeptSheetPDF } from '@/lib/pdf/ranch-ledger-dept'
+import { RanchLedgerRunSheetPDF } from '@/lib/pdf/ranch-ledger-run'
 import type { RunSheetAssignment } from '@/lib/pdf/run-sheet'
 import type { Assignment, Department, Event, EventBilling, ScheduleItem } from '@/lib/types'
 
@@ -204,6 +207,45 @@ async function main() {
     notes={[]}
     updatedByName="T Mac"
     layout="paged"
+  />)
+
+  // ── Ranch Ledger renders ───────────────────────────────────────────────────
+
+  await gen('rl-full-event-plan', <RanchLedgerFullEventPlanPDF
+    event={EVENT}
+    billing={BILLING}
+    showBilling={true}
+    scheduleItems={SCHEDULE}
+    assignments={ASSIGNMENTS}
+    departments={DEPTS}
+    notes={[]}
+    updatedByName="T Mac"
+  />)
+
+  await gen('rl-dept-sheet-kitchen', <RanchLedgerDeptSheetPDF
+    event={EVENT}
+    department={KITCHEN}
+    scheduleItems={SCHEDULE}
+    assignments={ASSIGNMENTS}
+    notes={[]}
+    updatedByName="T Mac"
+  />)
+
+  await gen('rl-multi-dept-combined', <RanchLedgerMultiDeptSheetPDF
+    event={EVENT}
+    departments={[KITCHEN, HOUSEKEEPING]}
+    assignments={ASSIGNMENTS}
+    scheduleItems={SCHEDULE}
+    notes={[]}
+    updatedByName="T Mac"
+    layout="combined"
+  />)
+
+  await gen('rl-run-sheet-all', <RanchLedgerRunSheetPDF
+    departments={DEPTS}
+    assignmentsByDept={assignByDept}
+    fromDate="2026-10-28"
+    toDate="2026-10-30"
   />)
 
   console.log('Done.')

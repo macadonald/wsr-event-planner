@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { Event, EventBilling, ScheduleItem, Assignment, Department, EventNote } from '@/lib/types'
@@ -34,6 +34,17 @@ export default function EventDetailClient({ event, billing, scheduleItems, assig
   const [deleting, setDeleting] = useState(false)
   const [selectedDeptIds, setSelectedDeptIds] = useState<Set<string>>(new Set())
   const [deptLayout, setDeptLayout] = useState<'paged' | 'combined'>('paged')
+  const [pdfStyle, setPdfStyle] = useState<'classic' | 'ledger'>('ledger')
+
+  useEffect(() => {
+    const stored = localStorage.getItem('wsr-pdf-style')
+    if (stored === 'classic' || stored === 'ledger') setPdfStyle(stored)
+  }, [])
+
+  function handleStyleChange(s: 'classic' | 'ledger') {
+    setPdfStyle(s)
+    localStorage.setItem('wsr-pdf-style', s)
+  }
 
   // Departments that have at least one assignment on this event
   const deptsWithWork = departments.filter(d => assignments.some(a => a.department_id === d.id))
@@ -129,14 +140,30 @@ export default function EventDetailClient({ event, billing, scheduleItems, assig
 
       {/* PDF print bar */}
       <div className="flex flex-wrap gap-4 items-start">
-        <a
-          href={`/api/pdf/event/${event.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs border border-cream-300 text-brown-500 hover:bg-cream-100 px-3 py-1.5 rounded-lg transition-colors shrink-0 self-center"
-        >
-          Print Full Plan
-        </a>
+        <div className="flex items-center gap-2 self-center">
+          <div className="flex rounded border border-cream-300 overflow-hidden text-xs">
+            {(['ledger', 'classic'] as const).map(opt => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => handleStyleChange(opt)}
+                className={`px-2 py-1 transition-colors ${
+                  pdfStyle === opt ? 'bg-brown-500 text-white' : 'bg-white text-brown-500 hover:bg-cream-50'
+                }`}
+              >
+                {opt === 'ledger' ? 'Ranch Ledger' : 'Classic'}
+              </button>
+            ))}
+          </div>
+          <a
+            href={`/api/pdf/event/${event.id}?style=${pdfStyle}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs border border-cream-300 text-brown-500 hover:bg-cream-100 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Print Full Plan
+          </a>
+        </div>
 
         {deptsWithWork.length > 0 && (
           <div className="border border-cream-200 rounded-lg px-3 py-2 space-y-2 bg-cream-50">
@@ -192,7 +219,7 @@ export default function EventDetailClient({ event, billing, scheduleItems, assig
                 )}
                 {selectedDeptIds.size === 1 ? (
                   <a
-                    href={`/api/pdf/event/${event.id}/dept/${Array.from(selectedDeptIds)[0]}`}
+                    href={`/api/pdf/event/${event.id}/dept/${Array.from(selectedDeptIds)[0]}?style=${pdfStyle}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs border border-cream-300 text-brown-500 hover:bg-cream-100 px-3 py-1 rounded-lg transition-colors"
@@ -201,12 +228,12 @@ export default function EventDetailClient({ event, billing, scheduleItems, assig
                   </a>
                 ) : (
                   <a
-                    href={`/api/pdf/event/${event.id}/depts?depts=${Array.from(selectedDeptIds).join(',')}&layout=${deptLayout}`}
+                    href={`/api/pdf/event/${event.id}/depts?depts=${Array.from(selectedDeptIds).join(',')}&layout=${deptLayout}&style=${pdfStyle}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs border border-cream-300 text-brown-500 hover:bg-cream-100 px-3 py-1 rounded-lg transition-colors"
                   >
-                    Print {selectedDeptIds.size} sheets
+                    Print
                   </a>
                 )}
               </div>

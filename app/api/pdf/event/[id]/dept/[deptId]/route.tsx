@@ -4,11 +4,12 @@ export const dynamic = 'force-dynamic'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
 import { DepartmentSheetPDF } from '@/lib/pdf/department-sheet'
+import { RanchLedgerDeptSheetPDF } from '@/lib/pdf/ranch-ledger-dept'
 import type { Assignment, Department, Event, EventNote, ScheduleItem } from '@/lib/types'
 import { slugify } from '@/lib/pdf/shared'
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: { id: string; deptId: string } }
 ) {
   const supabase = createClient()
@@ -18,6 +19,9 @@ export async function GET(
   const { data: profile } = await supabase
     .from('profiles').select('active').eq('id', user.id).single()
   if (!profile?.active) return new Response('Unauthorized', { status: 401 })
+
+  const { searchParams } = new URL(req.url)
+  const style = searchParams.get('style') === 'classic' ? 'classic' : 'ledger'
 
   const [
     { data: eventData },
@@ -42,15 +46,21 @@ export async function GET(
     updatedByName = updater?.full_name ?? null
   }
 
+  const sharedProps = {
+    event: eventData as Event,
+    department: deptData as Department,
+    scheduleItems: (scheduleData ?? []) as ScheduleItem[],
+    assignments: (assignmentData ?? []) as Assignment[],
+    notes: (notesData ?? []) as EventNote[],
+    updatedByName,
+  }
+
   type PdfArg = Parameters<typeof renderToBuffer>[0]
-  const buffer = await renderToBuffer(<DepartmentSheetPDF
-    event={eventData as Event}
-    department={deptData as Department}
-    scheduleItems={(scheduleData ?? []) as ScheduleItem[]}
-    assignments={(assignmentData ?? []) as Assignment[]}
-    notes={(notesData ?? []) as EventNote[]}
-    updatedByName={updatedByName}
-  /> as unknown as PdfArg)
+  const element = style === 'classic'
+    ? <DepartmentSheetPDF {...sharedProps} />
+    : <RanchLedgerDeptSheetPDF {...sharedProps} />
+
+  const buffer = await renderToBuffer(element as unknown as PdfArg)
 
   const filename = `${slugify(deptData.name)}-${slugify(eventData.name)}.pdf`
   return new Response(new Uint8Array(buffer), {
