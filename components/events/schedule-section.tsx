@@ -67,7 +67,7 @@ function ItemRow({
   if (editing) {
     return (
       <div className="border border-cream-200 rounded-lg p-3 space-y-2 bg-cream-50">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div>
             <label className="block text-xs text-brown-300 mb-0.5">Date</label>
             <input type="date" value={form.item_date} onChange={e => set('item_date', e.target.value)}
@@ -87,7 +87,7 @@ function ItemRow({
           <input value={form.title} onChange={e => set('title', e.target.value)}
             className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300" />
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label className="block text-xs text-brown-300 mb-0.5">Location</label>
             <input value={form.location} onChange={e => set('location', e.target.value)}
@@ -214,7 +214,7 @@ export default function ScheduleSection({
       {/* Add form */}
       {adding && (
         <div className="border border-cream-200 rounded-lg p-3 space-y-2 bg-cream-50 mb-4">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <label className="block text-xs text-brown-300 mb-0.5">Date</label>
               <input type="date" value={addForm.item_date} min={event.start_date} max={event.end_date}
@@ -236,7 +236,7 @@ export default function ScheduleSection({
               placeholder="Group Ride, Welcome Dinner…"
               className="w-full border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300" />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className="block text-xs text-brown-300 mb-0.5">Location</label>
               <input value={addForm.location} onChange={e => setAdd('location', e.target.value)}

@@ -82,7 +82,7 @@ export default function EventInfoSection({ event, canEdit }: { event: Event; can
               className="w-full border border-cream-300 rounded-lg px-3 py-2 text-sm bg-cream-50 focus:outline-none focus:ring-2 focus:ring-brown-300"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-brown-400 mb-1">Event Type</label>
               <select
@@ -105,7 +105,7 @@ export default function EventInfoSection({ event, canEdit }: { event: Event; can
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-brown-400 mb-1">Start Date</label>
               <input
@@ -126,7 +126,7 @@ export default function EventInfoSection({ event, canEdit }: { event: Event; can
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-brown-400 mb-1">Start Time</label>
               <TimePicker size="md" value={startTime} onChange={setStartTime} placeholder="None" />

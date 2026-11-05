@@ -237,22 +237,27 @@ export default function ChecklistView({
         <button
           type="button"
           onClick={() => setFiltersOpen(v => !v)}
-          className="sm:hidden text-sm text-brown-500 border border-cream-300 px-3 py-1.5 rounded-lg"
+          className="sm:hidden text-sm text-brown-500 border border-cream-300 px-4 py-2 rounded-lg"
         >
           Filters {filtersOpen ? '▴' : '▾'}
         </button>
       </div>
 
-      <div className="flex gap-6 items-start">
-        {/* Sidebar filters — desktop always visible, mobile collapsible */}
-        <aside className={`w-56 shrink-0 ${filtersOpen ? 'block' : 'hidden'} sm:block`}>
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
+        {/* Sidebar filters — desktop always visible, mobile slide-down */}
+        {filtersOpen && (
+          <div className="w-full sm:hidden bg-white border border-cream-200 rounded-xl p-4 shadow-sm space-y-5">
+            {filterBar}
+          </div>
+        )}
+        <aside className="hidden sm:block w-56 shrink-0">
           <div className="bg-white border border-cream-200 rounded-xl p-4 shadow-sm space-y-5">
             {filterBar}
           </div>
         </aside>
 
         {/* Assignment list */}
-        <div className="flex-1 min-w-0 space-y-6">
+        <div className="flex-1 min-w-0 space-y-6 w-full sm:w-auto">
           {filtered.length === 0 && (
             <p className="text-sm text-brown-300 py-8 text-center">
               {someDeptChecked ? 'No assignments match your filters.' : 'Select at least one department.'}

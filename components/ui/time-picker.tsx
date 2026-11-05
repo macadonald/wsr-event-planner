@@ -135,8 +135,8 @@ export default function TimePicker({ value, onChange, placeholder = 'None', size
     : 'flex-1 border border-cream-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-brown-300 cursor-pointer'
 
   const btnClass = size === 'md'
-    ? 'px-1.5 py-2 text-brown-400 hover:text-brown-600 border border-cream-300 bg-cream-50 text-sm leading-none transition-colors'
-    : 'px-1 py-1 text-brown-400 hover:text-brown-600 border border-cream-300 bg-white text-xs leading-none transition-colors'
+    ? 'min-w-[44px] min-h-[44px] px-2 py-2 text-brown-400 hover:text-brown-600 border border-cream-300 bg-cream-50 text-sm leading-none transition-colors flex items-center justify-center'
+    : 'min-w-[36px] min-h-[36px] px-1.5 py-1 sm:min-w-0 sm:min-h-0 sm:px-1 text-brown-400 hover:text-brown-600 border border-cream-300 bg-white text-xs leading-none transition-colors flex items-center justify-center'
 
   function select(v: string) {
     onChange(v)
@@ -217,7 +217,7 @@ export default function TimePicker({ value, onChange, placeholder = 'None', size
             type="button"
             tabIndex={0}
             onClick={() => select('')}
-            className="w-full text-left px-3 py-1.5 text-xs text-brown-300 hover:bg-cream-50"
+            className="w-full text-left px-3 py-2.5 sm:py-1.5 text-xs text-brown-300 hover:bg-cream-50"
           >
             — None —
           </button>
@@ -227,7 +227,7 @@ export default function TimePicker({ value, onChange, placeholder = 'None', size
               type="button"
               tabIndex={0}
               onClick={() => select(t.value)}
-              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-cream-50 ${
+              className={`w-full text-left px-3 py-2.5 sm:py-1.5 text-xs hover:bg-cream-50 ${
                 t.value === value ? 'font-semibold text-brown-700 bg-cream-50' : 'text-brown-600'
               }`}
             >

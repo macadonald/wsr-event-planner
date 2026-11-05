@@ -137,7 +137,7 @@ function AssignmentRow({ assignment, department, departments, canEdit, event, si
   if (editing) {
     return (
       <div className="border border-cream-200 rounded-lg p-3 space-y-2 bg-cream-50 my-1">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label className="block text-xs text-brown-300 mb-0.5">Department</label>
             <select
@@ -517,9 +517,9 @@ export default function AssignmentsSection({ event, assignments, departments, ca
         </div>
       </div>
 
-      {/* Dept filter chips */}
+      {/* Dept filter chips — horizontal scroll on mobile */}
       {usedDepts.length > 1 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 sm:flex-wrap no-scrollbar">
           <button
             onClick={() => setFilterDeptId(null)}
             className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
@@ -549,7 +549,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
           {/* Day chips (always shown — includes prep/teardown support) */}
           <div>
             <label className="block text-xs text-brown-300 mb-1">Day(s)</label>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar sm:flex-wrap">
               {/* Event day chips */}
               {eventDays.map(day => {
                 const active = selectedDates.includes(day)
@@ -625,7 +625,7 @@ export default function AssignmentsSection({ event, assignments, departments, ca
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className="block text-xs text-brown-300 mb-0.5">Department</label>
               <select

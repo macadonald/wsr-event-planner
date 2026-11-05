@@ -75,7 +75,7 @@ export default function CreateEventForm({ initialDate }: { initialDate?: string 
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-brown-400 mb-1">Event Type</label>
             <select
@@ -100,7 +100,7 @@ export default function CreateEventForm({ initialDate }: { initialDate?: string 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-brown-400 mb-1">Start Date <span className="text-red-400">*</span></label>
             <input
@@ -127,7 +127,7 @@ export default function CreateEventForm({ initialDate }: { initialDate?: string 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-brown-400 mb-1">Arrival / Start Time</label>
             <TimePicker size="md" value={startTime} onChange={setStartTime} placeholder="None" />
@@ -164,7 +164,7 @@ export default function CreateEventForm({ initialDate }: { initialDate?: string 
       <div className="bg-white border border-cream-200 rounded-xl p-5 shadow-sm space-y-4">
         <p className="text-xs font-semibold text-brown-400 uppercase tracking-wider">Contacts</p>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-brown-400 mb-1">Contact Name</label>
             <input
@@ -185,7 +185,7 @@ export default function CreateEventForm({ initialDate }: { initialDate?: string 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-brown-400 mb-1">Contact Email</label>
             <input

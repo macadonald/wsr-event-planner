@@ -59,7 +59,7 @@ export default function ContactsSection({ event, canEdit }: { event: Event; canE
 
       {editing ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-brown-400 mb-1">Contact Name</label>
               <input
@@ -77,7 +77,7 @@ export default function ContactsSection({ event, canEdit }: { event: Event; canE
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-brown-400 mb-1">Contact Email</label>
               <input

@@ -143,8 +143,8 @@ export default function EventDetailClient({ event, billing, scheduleItems, assig
       )}
 
       {/* PDF print bar */}
-      <div className="flex flex-wrap gap-4 items-start">
-        <div className="flex items-center gap-2 self-center">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 items-start">
+        <div className="flex items-center gap-2 self-start sm:self-center">
           <div className="flex rounded border border-cream-300 overflow-hidden text-xs">
             {(['ledger', 'classic'] as const).map(opt => (
               <button
