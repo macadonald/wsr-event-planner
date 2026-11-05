@@ -39,6 +39,12 @@ export default function Nav({ profile }: NavProps) {
             Calendar
           </Link>
           <Link
+            href="/checklist"
+            className="text-sm text-cream-200 hover:text-white transition-colors hidden sm:block"
+          >
+            Checklist
+          </Link>
+          <Link
             href="/run-sheet"
             className="text-sm text-cream-200 hover:text-white transition-colors hidden sm:block"
           >

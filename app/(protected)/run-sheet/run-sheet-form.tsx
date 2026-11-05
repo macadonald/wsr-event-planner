@@ -21,9 +21,7 @@ function nextWeek(): { from: string; to: string } {
 
 export default function RunSheetForm({ departments }: { departments: Department[] }) {
   const week = thisWeek()
-  const [selectedDeptIds, setSelectedDeptIds] = useState<Set<string>>(
-    () => new Set(departments.map(d => d.id))
-  )
+  const [selectedDeptIds, setSelectedDeptIds] = useState<Set<string>>(new Set())
   const [fromDate, setFromDate] = useState(week.from)
   const [toDate, setToDate] = useState(week.to)
   const [runLayout, setRunLayout] = useState<'paged' | 'combined'>('paged')

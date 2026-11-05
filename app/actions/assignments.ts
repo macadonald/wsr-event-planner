@@ -135,6 +135,31 @@ export async function deleteAssignment(
   return { error: null }
 }
 
+export async function markAssignmentDone(
+  id: string,
+  eventId: string,
+  done: boolean,
+): Promise<{ error: string | null }> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  const { data: profile } = await supabase.from('profiles').select('active').eq('id', user.id).single()
+  if (!profile?.active) return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('assignments')
+    .update({
+      completed_at: done ? new Date().toISOString() : null,
+      completed_by: done ? user.id : null,
+    })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+  revalidatePath(`/events/${eventId}`)
+  revalidatePath('/checklist')
+  return { error: null }
+}
+
 export async function deleteAssignmentGroup(
   repeatGroupId: string,
   eventId: string,

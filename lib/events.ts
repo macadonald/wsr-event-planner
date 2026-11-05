@@ -1,10 +1,13 @@
-import { isBeforeToday, formatDate, formatDateWithDay } from './time'
-import type { Event, EventStatus, EventType } from './types'
+import { todayInPhoenix, formatDate, formatDateWithDay } from './time'
+import type { Event, EventType } from './types'
 
-export type DisplayStatus = 'completed' | EventStatus
+export type DisplayStatus = 'upcoming' | 'current' | 'completed'
 
-export function getDisplayStatus(event: Pick<Event, 'end_date' | 'status'>): DisplayStatus {
-  return isBeforeToday(event.end_date) ? 'completed' : event.status
+export function getDisplayStatus(event: Pick<Event, 'start_date' | 'end_date'>): DisplayStatus {
+  const today = todayInPhoenix()
+  if (event.end_date < today) return 'completed'
+  if (event.start_date <= today) return 'current'
+  return 'upcoming'
 }
 
 // Count inclusive days. Safe: UTC arithmetic on date strings, no TZ shift.
@@ -71,14 +74,14 @@ export const EVENT_TYPE_COLORS: Record<string, string> = {
 }
 
 export const STATUS_COLORS: Record<DisplayStatus, string> = {
-  planning:  'bg-cream-200 text-brown-500',
-  finalized: 'bg-green-100 text-green-700',
+  upcoming:  'bg-blue-100 text-blue-700',
+  current:   'bg-green-100 text-green-700',
   completed: 'bg-gray-100 text-gray-500',
 }
 
 export const STATUS_LABELS: Record<DisplayStatus, string> = {
-  planning:  'Planning',
-  finalized: 'Finalized',
+  upcoming:  'Upcoming',
+  current:   'Current',
   completed: 'Completed',
 }
 

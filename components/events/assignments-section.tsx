@@ -131,6 +131,8 @@ function AssignmentRow({ assignment, department, departments, canEdit, event, si
   const deptColor = department?.color ?? '#888'
   const updaterName = assignment.updated_by ? (profilesMap[assignment.updated_by] ?? null) : null
   const isChanged = isWithinHours(assignment.updated_at, recentHours)
+  const isDone = assignment.completed_at !== null
+  const completerName = assignment.completed_by ? (profilesMap[assignment.completed_by] ?? null) : null
 
   if (editing) {
     return (
@@ -230,28 +232,37 @@ function AssignmentRow({ assignment, department, departments, canEdit, event, si
         <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: deptColor }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5">
-            <p className="text-sm text-brown-700 leading-snug">{assignment.task}</p>
-            {isChanged && (
+            <p className={`text-sm leading-snug ${isDone ? 'line-through text-brown-300' : 'text-brown-700'}`}>
+              {isDone && <span className="not-italic text-green-600 no-underline">✓ </span>}
+              {assignment.task}
+            </p>
+            {isChanged && !isDone && (
               <span className="inline-block text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full leading-none shrink-0">
                 Changed
               </span>
             )}
           </div>
-          {(timeLabel || assignment.notes) && (
+          {!isDone && (timeLabel || assignment.notes) && (
             <p className="text-xs text-brown-400 mt-0.5">
               {timeLabel}
               {timeLabel && assignment.notes ? '  ·  ' : ''}
               {assignment.notes}
             </p>
           )}
-          {siblingDates.length > 0 && (
+          {!isDone && siblingDates.length > 0 && (
             <p className="text-xs text-brown-300 mt-0.5">
               ↻ also {siblingDates.map(d => formatDateShortWithDay(d)).join(', ')}
             </p>
           )}
-          <p className="text-xs text-brown-300 mt-0.5" title={formatTimestamp(assignment.updated_at)}>
-            Updated {relativeTime(assignment.updated_at)}{updaterName ? `  ·  ${updaterName}` : ''}
-          </p>
+          {isDone ? (
+            <p className="text-xs text-green-600 mt-0.5" title={assignment.completed_at ? formatTimestamp(assignment.completed_at) : ''}>
+              Done{completerName ? ` by ${completerName}` : ''}{assignment.completed_at ? ` · ${relativeTime(assignment.completed_at)}` : ''}
+            </p>
+          ) : (
+            <p className="text-xs text-brown-300 mt-0.5" title={formatTimestamp(assignment.updated_at)}>
+              Updated {relativeTime(assignment.updated_at)}{updaterName ? `  ·  ${updaterName}` : ''}
+            </p>
+          )}
         </div>
         {canEdit && (
           <div className="flex gap-1 shrink-0 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:transition-opacity">

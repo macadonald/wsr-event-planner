@@ -10,10 +10,12 @@ function EventCard({
   event,
   updaterName,
   recentHours,
+  counts,
 }: {
   event: Event
   updaterName: string | null
   recentHours: number
+  counts: { total: number; done: number } | undefined
 }) {
   const status = getDisplayStatus(event)
   const isChanged = isWithinHours(event.updated_at, recentHours)
@@ -50,6 +52,11 @@ function EventCard({
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[status]}`}>
             {STATUS_LABELS[status]}
           </span>
+          {counts && counts.total > 0 && (
+            <span className="text-xs text-brown-300">
+              {counts.done} / {counts.total} done
+            </span>
+          )}
           {event.pax != null && (
             <span className="text-xs text-brown-300">{event.pax} guests</span>
           )}
@@ -60,17 +67,22 @@ function EventCard({
 }
 
 export default function EventsList({
+  current,
   upcoming,
-  past,
+  completed,
   profilesMap,
   recentHours,
+  completionCounts,
 }: {
+  current: Event[]
   upcoming: Event[]
-  past: Event[]
+  completed: Event[]
   profilesMap: Record<string, string | null>
   recentHours: number
+  completionCounts: Record<string, { total: number; done: number }>
 }) {
   const [search, setSearch] = useState('')
+  const [showCompleted, setShowCompleted] = useState(false)
 
   function filter(events: Event[]) {
     if (!search.trim()) return events
@@ -82,9 +94,19 @@ export default function EventsList({
     )
   }
 
+  const filteredCurrent = filter(current)
   const filteredUpcoming = filter(upcoming)
-  const filteredPast = filter(past)
-  const hasResults = filteredUpcoming.length > 0 || filteredPast.length > 0
+  const filteredCompleted = filter(completed)
+  const hasResults = filteredCurrent.length > 0 || filteredUpcoming.length > 0 || filteredCompleted.length > 0
+
+  function cardProps(e: Event) {
+    return {
+      event: e,
+      updaterName: e.updated_by ? (profilesMap[e.updated_by] ?? null) : null,
+      recentHours,
+      counts: completionCounts[e.id],
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -102,35 +124,38 @@ export default function EventsList({
         </p>
       )}
 
-      {filteredUpcoming.length > 0 && (
+      {filteredCurrent.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold text-brown-400 uppercase tracking-wider mb-3">Upcoming</h2>
+          <h2 className="text-xs font-semibold text-brown-400 uppercase tracking-wider mb-3">Current</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredUpcoming.map(e => (
-              <EventCard
-                key={e.id}
-                event={e}
-                updaterName={e.updated_by ? (profilesMap[e.updated_by] ?? null) : null}
-                recentHours={recentHours}
-              />
-            ))}
+            {filteredCurrent.map(e => <EventCard key={e.id} {...cardProps(e)} />)}
           </div>
         </section>
       )}
 
-      {filteredPast.length > 0 && (
+      {filteredUpcoming.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold text-brown-400 uppercase tracking-wider mb-3">Past</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 opacity-70">
-            {filteredPast.map(e => (
-              <EventCard
-                key={e.id}
-                event={e}
-                updaterName={e.updated_by ? (profilesMap[e.updated_by] ?? null) : null}
-                recentHours={recentHours}
-              />
-            ))}
+          <h2 className="text-xs font-semibold text-brown-400 uppercase tracking-wider mb-3">Upcoming</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredUpcoming.map(e => <EventCard key={e.id} {...cardProps(e)} />)}
           </div>
+        </section>
+      )}
+
+      {filteredCompleted.length > 0 && (
+        <section>
+          <button
+            onClick={() => setShowCompleted(v => !v)}
+            className="flex items-center gap-2 text-xs font-semibold text-brown-400 uppercase tracking-wider mb-3 hover:text-brown-600 transition-colors"
+          >
+            <span>{showCompleted ? '▾' : '▸'}</span>
+            Completed ({filteredCompleted.length})
+          </button>
+          {showCompleted && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 opacity-70">
+              {filteredCompleted.map(e => <EventCard key={e.id} {...cardProps(e)} />)}
+            </div>
+          )}
         </section>
       )}
     </div>

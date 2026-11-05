@@ -15,19 +15,29 @@ export default async function DashboardPage() {
     { data },
     { data: profilesData },
     { data: settingData },
+    { data: assignmentData },
   ] = await Promise.all([
     supabase.from('events').select('*').order('start_date', { ascending: true }),
     supabase.from('profiles').select('id, full_name'),
     supabase.from('app_settings').select('value').eq('key', 'recent_changes_hours').single(),
+    supabase.from('assignments').select('event_id, completed_at'),
   ])
 
   const events = (data ?? []) as Event[]
-  const upcoming = events.filter(e => e.end_date >= today)
-  const past = events.filter(e => e.end_date < today).reverse()
+  const current = events.filter(e => e.start_date <= today && e.end_date >= today)
+  const upcoming = events.filter(e => e.start_date > today)
+  const completed = events.filter(e => e.end_date < today).reverse()
 
   const profilesMap: Record<string, string | null> = {}
   for (const p of (profilesData ?? [])) {
     profilesMap[p.id] = p.full_name
+  }
+
+  const completionCounts: Record<string, { total: number; done: number }> = {}
+  for (const a of (assignmentData ?? [])) {
+    if (!completionCounts[a.event_id]) completionCounts[a.event_id] = { total: 0, done: 0 }
+    completionCounts[a.event_id].total++
+    if (a.completed_at) completionCounts[a.event_id].done++
   }
 
   const recentHours = parseInt(settingData?.value ?? '48', 10)
@@ -46,7 +56,14 @@ export default async function DashboardPage() {
           </Link>
         )}
       </div>
-      <EventsList upcoming={upcoming} past={past} profilesMap={profilesMap} recentHours={recentHours} />
+      <EventsList
+        current={current}
+        upcoming={upcoming}
+        completed={completed}
+        profilesMap={profilesMap}
+        recentHours={recentHours}
+        completionCounts={completionCounts}
+      />
     </div>
   )
 }
