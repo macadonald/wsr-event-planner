@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import EventDetailClient from '@/components/events/event-detail-client'
-import type { Event, EventBilling, ScheduleItem, Assignment, Department, EventNote, EventActivity } from '@/lib/types'
+import type { Event, EventBilling, ScheduleItem, Assignment, Department, EventNote, EventActivity, EventCharge, PriceItem, BillingSettings } from '@/lib/types'
 
 export default async function EventPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -25,6 +25,9 @@ export default async function EventPage({ params }: { params: { id: string } }) 
     { data: activityData },
     { data: profilesData },
     { data: settingData },
+    { data: chargesData },
+    { data: priceItemsData },
+    { data: billingSettingsData },
   ] = await Promise.all([
     supabase.from('events').select('*').eq('id', params.id).single(),
     supabase.from('event_billing').select('*').eq('event_id', params.id).maybeSingle(),
@@ -35,6 +38,10 @@ export default async function EventPage({ params }: { params: { id: string } }) 
     supabase.from('event_activity').select('*').eq('event_id', params.id).order('created_at', { ascending: false }).limit(30),
     supabase.from('profiles').select('id, full_name'),
     supabase.from('app_settings').select('value').eq('key', 'recent_changes_hours').single(),
+    // Charges + price list only fetched for admin/planner — viewer RLS returns empty
+    supabase.from('event_charges').select('*').eq('event_id', params.id).order('category').order('sort_order'),
+    supabase.from('price_items').select('*').order('category').order('sort_order').order('name'),
+    supabase.from('billing_settings').select('*').limit(1).maybeSingle(),
   ])
 
   if (!eventData) notFound()
@@ -60,6 +67,14 @@ export default async function EventPage({ params }: { params: { id: string } }) 
   const departments = (departmentData ?? []) as Department[]
   const notes = (notesData ?? []) as EventNote[]
   const activity = (activityData ?? []) as EventActivity[]
+  const charges = (chargesData ?? []) as EventCharge[]
+  const priceItems = (priceItemsData ?? []) as PriceItem[]
+  const billingSettings = billingSettingsData as BillingSettings | null
+
+  const defaultBillingSettings: BillingSettings = billingSettings ?? {
+    id: '', tax_pct: 6.1, tax_on_service: false,
+    regular_markup_note: null, updated_at: '', updated_by: null,
+  }
 
   const canEdit = profile.role === 'admin' || profile.role === 'planner'
 
@@ -76,6 +91,9 @@ export default async function EventPage({ params }: { params: { id: string } }) 
       profilesMap={profilesMap}
       recentHours={recentHours}
       activity={activity}
+      charges={charges}
+      priceItems={priceItems}
+      billingSettings={defaultBillingSettings}
     />
   )
 }

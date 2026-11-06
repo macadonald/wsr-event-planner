@@ -160,6 +160,30 @@ Goal: **less paper**. Compact, efficient layouts. Small but readable type (9–1
 - Desktop first, but must work on a phone.
 - No feature bloat.
 
+## Billing (Waves 1 + 2 — built)
+
+**Price List** (`price_items` table, admin-managed at Settings → Price List):
+- Fields: category, name, unit (`per_event`|`per_person`|`each`|`per_hour`), dmc_price, regular_price (null = same as DMC), included_people, additional_per_person_dmc/regular, max_capacity, minimum (hours), service_pct, taxable, notes, active, sort_order.
+- Global settings in `billing_settings` (single row): tax_pct (default 6.1%), tax_on_service, regular_markup_note.
+- Seed data: `data/price-list-seed.csv` (71 rows of real WSR items). Run once: `npx tsx scripts/seed-price-list.ts`
+
+**Event Charges** (`event_charges` table):
+- Each event has a `price_level` field: `dmc` | `regular` (default `regular`).
+- Charges store a **snapshot** of price, service%, taxable, included_people, additional_per_person at time of add — later price-list edits don't change existing bills.
+- Duplicate event copies all charges (dates shifted if `charge_date` is set).
+- Viewers never see charges.
+
+**Calculations** (`lib/billing.ts`, fully unit-tested via `npx tsx lib/billing.test.ts`):
+- `calculateCharge(input, tax_pct, tax_on_service)` → {amount, service_amount, tax_amount, total, warnings}
+- per_event: base price + (people − included_people) × additional_per_person. Warn if > max_capacity.
+- per_person: price × people. per_hour: price × hours (warn if below minimum). each: price × qty.
+- `computeBillSummary(lines)` → category subtotals + service + tax + grand total.
+
+**Event page tabs**: Details · Assignments · Charges (Charges hidden from viewers).
+
+**Not yet built**:
+- Invoices, payment tracking, inventory counts, labor, lodging.
+
 ## LATER — do NOT build until asked
 - Email via Resend: send each department its PDF, preview before sending, send log with delivery status, "Send Updated Assignments" (only to departments whose tasks changed, marked REVISED). Never auto-send on edit.
 - Viewer "mark done" on assignments.

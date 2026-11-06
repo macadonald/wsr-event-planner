@@ -48,6 +48,7 @@ export type Event = {
   description: string | null
   special_notes: string | null
   status: EventStatus
+  price_level: PriceLevel
   created_by: string | null
   updated_by: string | null
   created_at: string
@@ -122,7 +123,7 @@ export type EventActivity = {
   actor_id: string | null
   actor_name: string | null
   action: 'added' | 'edited' | 'deleted'
-  entity_type: 'assignment' | 'schedule_item' | 'note' | 'event'
+  entity_type: 'assignment' | 'schedule_item' | 'note' | 'event' | 'charge'
   summary: string
   created_at: string
 }
@@ -131,6 +132,63 @@ export type AppSetting = {
   key: string
   value: string
   updated_by: string | null
+  updated_at: string
+}
+
+export type PriceLevel = 'dmc' | 'regular'
+
+export type PriceItem = {
+  id: string
+  category: string
+  name: string
+  unit: 'per_event' | 'per_person' | 'each' | 'per_hour'
+  dmc_price: number
+  regular_price: number | null
+  included_people: number | null
+  additional_per_person_dmc: number | null
+  additional_per_person_regular: number | null
+  max_capacity: number | null
+  minimum: number | null
+  service_pct: number
+  taxable: boolean
+  notes: string | null
+  active: boolean
+  sort_order: number
+  created_at: string
+}
+
+export type BillingSettings = {
+  id: string
+  tax_pct: number
+  tax_on_service: boolean
+  regular_markup_note: string | null
+  updated_at: string
+  updated_by: string | null
+}
+
+export type EventCharge = {
+  id: string
+  event_id: string
+  price_item_id: string | null
+  category: string
+  name: string
+  unit: 'per_event' | 'per_person' | 'each' | 'per_hour'
+  quantity: number | null
+  hours: number | null
+  people: number | null
+  charge_date: string | null   // 'YYYY-MM-DD'
+  notes: string | null
+  unit_price: number
+  list_price: number | null
+  additional_per_person: number | null
+  included_people: number | null
+  service_pct: number
+  taxable: boolean
+  price_overridden: boolean
+  sort_order: number
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
   updated_at: string
 }
 
@@ -160,7 +218,7 @@ export type Database = {
       }
       events: {
         Row: Event
-        Insert: Omit<Event, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Insert: Omit<Event, 'id' | 'created_at' | 'updated_at' | 'price_level'> & { id?: string; created_at?: string; updated_at?: string; price_level?: 'dmc' | 'regular' }
         Update: Partial<Omit<Event, 'id'>>
         Relationships: []
       }
@@ -198,6 +256,24 @@ export type Database = {
         Row: AppSetting
         Insert: Partial<AppSetting> & { key: string; value: string }
         Update: Partial<AppSetting>
+        Relationships: []
+      }
+      price_items: {
+        Row: PriceItem
+        Insert: Omit<PriceItem, 'id' | 'created_at'> & { id?: string; created_at?: string }
+        Update: Partial<Omit<PriceItem, 'id'>>
+        Relationships: []
+      }
+      billing_settings: {
+        Row: BillingSettings
+        Insert: Omit<BillingSettings, 'id' | 'updated_at'> & { id?: string; updated_at?: string }
+        Update: Partial<Omit<BillingSettings, 'id'>>
+        Relationships: []
+      }
+      event_charges: {
+        Row: EventCharge
+        Insert: Omit<EventCharge, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Update: Partial<Omit<EventCharge, 'id'>>
         Relationships: []
       }
     }

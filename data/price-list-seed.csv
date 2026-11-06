@@ -1,0 +1,72 @@
+category,name,unit,dmc_price,regular_price,included_people,additional_per_person_dmc,additional_per_person_regular,max_capacity,minimum,service_pct,taxable,notes
+Venues,Desert Pavilion,per_event,750,1050,75,10,14,200,,0,yes,
+Venues,Small Desert Site,per_event,500,700,40,,,40,,0,yes,Regular sheet said 100ppl or less; max is 40 — confirm
+Venues,Longhorn Meeting Room,per_event,500,700,100,,,100,,0,yes,
+Venues,Bird Garden,per_event,350,490,25,,,25,,0,yes,
+Venues,Private Dining Room,per_event,250,350,38,,,38,,0,yes,
+Venues,Lower & Middle Patio,per_event,250,350,75,,,75,,0,yes,
+Venues,WSR Bar,per_event,150,210,25,,,25,,0,yes,In-house bar
+Venues,Movie Set Site,per_event,550,770,75,10,14,100,,0,yes,
+Venues,Jeep Tour (venue),per_event,675,,7,,,100,,0,yes,Can accommodate up to 100; also listed under Activities at $55/person — confirm
+Weddings,Desert Pavilion Package (75),per_event,9500,9500,75,,,75,,0,yes,
+Weddings,Desert Pavilion Package (150),per_event,11500,11500,150,25,25,300,,0,yes,
+Weddings,Longhorn Package,per_event,7500,7500,100,25,25,150,,0,yes,
+Weddings,Bird Garden Package,per_event,7000,7000,25,,,25,,0,yes,
+Add-Ons,Table Removal Fee,per_event,750,750,,,,,,0,yes,
+Add-Ons,Round Table Rental,each,20,20,,,,11,,0,yes,Max 11 available
+Add-Ons,Cocktail Table,each,15,15,,,,,,0,yes,
+Add-Ons,Wine Barrel,each,50,50,,,,,,0,yes,
+Add-Ons,Chair Rental,each,5,5,,,,,,0,yes,
+Add-Ons,Bonfire w/ Serapes,per_event,175,175,,,,,,0,yes,
+Add-Ons,S'mores,per_event,100,100,,,,,,0,yes,
+Add-Ons,Lawn Games,per_event,250,250,,,,,,0,yes,
+Add-Ons,Carnival Games,per_event,1000,1000,,,,,,20,yes,
+Add-Ons,Two Roping Dummies,per_event,200,200,,,,,,20,yes,
+Add-Ons,Mechanical Roping Dummy,per_event,500,500,,,,,,20,yes,
+Add-Ons,Electrical Roping Dummy,per_event,500,500,,,,,,20,yes,
+Bar,The Basics - Beer Wine and Margs,per_person,35,35,,,,149,,20,yes,Under 150 guests
+Bar,The Standard - Beer Wine and House Liquor,per_person,40,40,,,,149,,22,yes,Under 150 guests
+Bar,The Premium - Top Shelf & Craft,per_person,50,50,,,,149,,25,yes,Under 150 guests
+Bar,The Basics - Beer Wine and Margs (150+),per_person,56.67,56.67,,,,,150,21,yes,150+ guests; confirm exact rate
+Bar,The Standard - Beer Wine and House Liquor (150+),per_person,64.17,64.17,,,,,150,23,yes,150+ guests; confirm exact rate
+Bar,The Premium - Top Shelf & Craft (150+),per_person,71.67,71.67,,,,,150,26,yes,150+ guests; confirm exact rate
+Bar,Cash Bar Setup - Basic,each,175,175,,,,,,0,yes,
+Bar,Cash Bar Setup - Liquor,each,200,200,,,,,,0,yes,
+WSR Catering,Veggies and Dip,per_person,8,8,,,,,,20,yes,
+WSR Catering,Fried Food,per_person,10,10,,,,,,20,yes,
+WSR Catering,Pot Stickers,per_person,10,10,,,,,,20,yes,
+WSR Catering,Cookies and Brownies,per_person,5,5,,,,,,20,yes,
+WSR Catering,Dessert Bar,per_person,8,8,,,,,,20,yes,
+WSR Catering,Trail Mix,per_person,5,5,,,,,,20,yes,
+WSR Catering,Chips and Salsa,per_person,5,5,,,,,,20,yes,
+WSR Catering,Box Lunches,per_person,13,13,,,,40,,20,yes,Soft cap 40 — check with Kitchen
+WSR Catering,Charcuterie Board,per_person,20,20,,,,,,20,yes,
+WSR Cakes,8in Single Layer (serves 6-8),each,25,25,,,,,,20,yes,Frosting: Vanilla/Chocolate. Filling: Vanilla/Chocolate/Raspberry
+WSR Cakes,8in Double Layer (serves 8-12),each,31,31,,,,,,20,yes,
+WSR Cakes,1/4 Sheet (serves 16-24),each,35,35,,,,,,20,yes,
+WSR Cakes,1/2 Sheet (serves 32-48),each,45,45,,,,,,20,yes,
+WSR Cakes,Full Sheet (serves 64-96),each,67,67,,,,,,20,yes,
+WSR Cakes,Gluten Free 1/8 Sheet (serves 6-8),each,25,25,,,,,,20,yes,
+Activities,Slow Flat Ride,per_person,90,90,,,,,,0,yes,
+Activities,Hayride,each,440,440,,,,,,0,yes,Per wagon
+Activities,Horsemanship Demo,per_person,45,45,,,,,,0,yes,
+Activities,Soundbath with the Herd,per_person,35,35,,,,,,0,yes,
+Activities,Shooting (.22 cal),per_person,75,75,,,,,,0,yes,
+Activities,Shooting (.45 cal),per_person,150,150,,,,,,0,yes,
+Activities,Archery,per_person,75,75,,,,,,0,yes,
+Activities,Axe Throwing,per_person,80,80,,,,,,0,yes,
+Activities,Slingshots or Knife Throwing,per_person,55,55,,,,,,0,yes,
+Activities,Guided Hike - Echo Mountain,per_person,40,40,,,,,,0,yes,
+Activities,Rock Climbing,per_person,125,125,,,,,,0,yes,
+Activities,Jeep Tours,per_person,55,55,,,,,,0,yes,
+Activities,Raptor Experience,per_event,500,500,10,25,25,,,0,yes,$500 for 10 or less + $25 each additional
+Activities,Rodeo,per_hour,2500,2500,,,,,,0,yes,
+Activities,Paint and Sip,per_person,65,65,,,,,,0,yes,
+Activities,Line Dancing,per_hour,300,300,,,,,,0,yes,
+Activities,Cowboy Singer,per_hour,200,200,,,,,,0,yes,
+Activities,Astronomer,per_hour,400,400,,,,,,0,yes,
+Activities,Whiskey Tasting,per_event,1000,1000,75,10,10,,,0,yes,$1000 for 75 or less + $10 each additional
+Activities,Sonoran Glass,per_hour,35,35,,,,,2,0,yes,$35-$75/hr depending on option; 2 hr minimum — set price per event
+Activities,Bonnie Photo Booth,per_hour,350,350,,,,,,0,yes,
+Activities,PA System,per_event,250,250,,,,,,0,yes,
+Activities,Rowdy Hat Bar,per_event,1500,1500,,,,,,0,yes,Includes 12 hats; $150 each additional hat

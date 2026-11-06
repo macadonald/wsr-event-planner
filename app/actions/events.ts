@@ -32,6 +32,7 @@ export type EventFormData = {
   description: string | null
   special_notes: string | null
   status: EventStatus
+  price_level?: 'dmc' | 'regular'
 }
 
 export async function createEvent(data: EventFormData): Promise<{ id?: string; error: string | null }> {
@@ -122,6 +123,7 @@ export async function duplicateEvent(
       description: source.description,
       special_notes: source.special_notes,
       status: 'planning' as EventStatus,
+      price_level: source.price_level ?? 'regular',
       created_by: ctx.userId,
       updated_by: ctx.userId,
     })
@@ -163,6 +165,36 @@ export async function duplicateEvent(
         notes: item.notes,
         completed_at: null,
         completed_by: null,
+        created_by: ctx.userId,
+        updated_by: ctx.userId,
+      }))
+    )
+  }
+
+  // Copy event charges (snapshots — prices preserved, dates shifted if set)
+  const { data: charges } = await ctx.supabase
+    .from('event_charges').select('*').eq('event_id', sourceId)
+  if (charges?.length) {
+    await ctx.supabase.from('event_charges').insert(
+      charges.map((c) => ({
+        event_id: newEvent.id,
+        price_item_id: c.price_item_id,
+        category: c.category,
+        name: c.name,
+        unit: c.unit,
+        quantity: c.quantity,
+        hours: c.hours,
+        people: c.people,
+        charge_date: c.charge_date ? shiftDate(c.charge_date, offset) : null,
+        notes: c.notes,
+        unit_price: c.unit_price,
+        list_price: c.list_price,
+        additional_per_person: c.additional_per_person,
+        included_people: c.included_people,
+        service_pct: c.service_pct,
+        taxable: c.taxable,
+        price_overridden: c.price_overridden,
+        sort_order: c.sort_order,
         created_by: ctx.userId,
         updated_by: ctx.userId,
       }))

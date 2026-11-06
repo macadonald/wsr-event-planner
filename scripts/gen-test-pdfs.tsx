@@ -44,6 +44,7 @@ const EVENT: Event = {
   description: null,
   special_notes: '3 vegetarians · 1 gluten-free · VIP: CEO Janine Ortega, room 12',
   status: 'finalized',
+  price_level: 'regular',
   created_by: 'u1',
   updated_by: 'u1',
   created_at: '2026-10-01T00:00:00Z',
