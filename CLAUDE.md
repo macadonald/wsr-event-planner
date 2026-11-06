@@ -182,7 +182,31 @@ Goal: **less paper**. Compact, efficient layouts. Small but readable type (9–1
 **Event page tabs**: Details · Assignments · Charges (Charges hidden from viewers).
 
 **Not yet built**:
-- Invoices, payment tracking, inventory counts, labor, lodging.
+- Invoices, payment tracking, labor, lodging.
+
+## Billing Wave 3 — Furniture Inventory (built)
+
+**Tables** (`inventory_items`, `inventory_counts`):
+- `inventory_items`: name, category (Tables/Seating/Décor/Equipment/Other — user-extensible), quantity_owned (NULL = not counted yet), qty_needs_repair, qty_retired, storage_location, notes, price_item_id (optional link to price list), active, sort_order.
+- `inventory_counts`: records a physical count; inserting a row automatically updates `quantity_owned` on the item via trigger.
+- `event_charges.inventory_item_id`: set automatically via trigger when a charge's price_item_id links to an inventory item.
+- RLS: all active users read; admin + planner insert/update; admin only deletes/deactivates.
+- Seed: 4 items linked to their price items (Round Tables, Cocktail Tables, Chairs, Wine Barrels), all quantity_owned NULL.
+
+**Availability** (`lib/inventory.ts`):
+- Usable = owned − needs_repair − retired.
+- Booked on a date = sum of charge quantities where charge_date matches, or (if no charge_date) every day of the event.
+- `computeAvailableOnDate(item, usages, date)` → usable − booked.
+
+**Inventory page** (`/inventory`, all users):
+- Category chip filter, search, responsive table (desktop) / cards (mobile).
+- Shows: Owned, Available today, Needs repair, Last counted (amber if 90+ days stale or never counted).
+- "+ Add item" inline form with category datalist and optional price item link.
+- Item detail page (`/inventory/[id]`): edit fields, record count, count history, upcoming use list.
+
+**Charges tab integration**:
+- Lines linked to an inventory item show inline availability badge: "X of Y available Wed 11/5".
+- Amber warning if overbooked.
 
 ## LATER — do NOT build until asked
 - Email via Resend: send each department its PDF, preview before sending, send log with delivery status, "Send Updated Assignments" (only to departments whose tasks changed, marked REVISED). Never auto-send on edit.

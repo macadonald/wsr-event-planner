@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import EventDetailClient from '@/components/events/event-detail-client'
+import { computeUsable, computeBookedOnDate, type InventoryUsage } from '@/lib/inventory'
 import type { Event, EventBilling, ScheduleItem, Assignment, Department, EventNote, EventActivity, EventCharge, PriceItem, BillingSettings } from '@/lib/types'
 
 export default async function EventPage({ params }: { params: { id: string } }) {
@@ -78,6 +79,54 @@ export default async function EventPage({ params }: { params: { id: string } }) 
 
   const canEdit = profile.role === 'admin' || profile.role === 'planner'
 
+  // ── Inventory availability for charge lines ──────────────────────────────────
+  const inventoryItemIds = Array.from(new Set(
+    charges.filter(c => c.inventory_item_id).map(c => c.inventory_item_id!)
+  ))
+
+  const inventoryAvailability: Record<string, { usable: number | null; available: number | null }> = {}
+
+  if (inventoryItemIds.length > 0) {
+    const [{ data: invItems }, { data: allInvCharges }] = await Promise.all([
+      supabase
+        .from('inventory_items')
+        .select('id, quantity_owned, qty_needs_repair, qty_retired')
+        .in('id', inventoryItemIds),
+      supabase
+        .from('event_charges')
+        .select('inventory_item_id, quantity, charge_date, events(start_date, end_date)')
+        .in('inventory_item_id', inventoryItemIds),
+    ])
+
+    if (invItems && allInvCharges) {
+      type RawCharge = { inventory_item_id: string; quantity: number | null; charge_date: string | null; events: { start_date: string; end_date: string } | null }
+      const usages: InventoryUsage[] = (allInvCharges as unknown as RawCharge[])
+        .filter(c => c.events)
+        .map(c => ({
+          inventory_item_id: c.inventory_item_id,
+          quantity: c.quantity,
+          charge_date: c.charge_date,
+          event_start_date: c.events!.start_date,
+          event_end_date: c.events!.end_date,
+        }))
+
+      for (const charge of charges) {
+        if (!charge.inventory_item_id) continue
+        const date = charge.charge_date ?? event.start_date
+        const key = `${charge.inventory_item_id}:${date}`
+        if (inventoryAvailability[key] !== undefined) continue
+        const item = invItems.find(i => i.id === charge.inventory_item_id)
+        if (!item) continue
+        const itemUsages = usages.filter(u => u.inventory_item_id === charge.inventory_item_id)
+        const usable = computeUsable(item)
+        inventoryAvailability[key] = {
+          usable,
+          available: usable !== null ? usable - computeBookedOnDate(itemUsages, date) : null,
+        }
+      }
+    }
+  }
+
   return (
     <EventDetailClient
       event={event}
@@ -94,6 +143,7 @@ export default async function EventPage({ params }: { params: { id: string } }) 
       charges={charges}
       priceItems={priceItems}
       billingSettings={defaultBillingSettings}
+      inventoryAvailability={inventoryAvailability}
     />
   )
 }

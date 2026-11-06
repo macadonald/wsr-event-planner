@@ -8,7 +8,7 @@ import {
   formatMoney, formatUnitLabel, type ChargeUnit,
 } from '@/lib/billing'
 import { addCharge, updateCharge, deleteCharge, updatePriceLevel, bulkUpdatePeople } from '@/app/actions/charges'
-import { formatDate } from '@/lib/time'
+import { formatDate, formatDateShortWithDay } from '@/lib/time'
 
 // ── BillSummary ───────────────────────────────────────────────────────────────
 
@@ -83,13 +83,17 @@ function BillSummaryCard({
 
 // ── ChargeRow ─────────────────────────────────────────────────────────────────
 
+type InventoryInfo = { usable: number | null; available: number | null; date: string }
+
 function ChargeRow({
   charge,
   taxSettings,
+  inventoryInfo,
   onDelete,
 }: {
   charge: EventCharge
   taxSettings: BillingSettings
+  inventoryInfo?: InventoryInfo | null
   onDelete: () => void
 }) {
   const router = useRouter()
@@ -155,6 +159,18 @@ function ChargeRow({
             {result.warnings.map((w, i) => (
               <span key={i} className="text-xs text-amber-600 font-medium">{w}</span>
             ))}
+            {inventoryInfo && inventoryInfo.usable !== null && (
+              <span className={`text-xs font-medium ${
+                inventoryInfo.available !== null && inventoryInfo.available < 0
+                  ? 'text-amber-600'
+                  : 'text-brown-400'
+              }`}>
+                {inventoryInfo.available !== null && inventoryInfo.available < 0
+                  ? `${Math.abs(inventoryInfo.available)} short (overbooked) ${formatDateShortWithDay(inventoryInfo.date)}`
+                  : `${inventoryInfo.available} of ${inventoryInfo.usable} available ${formatDateShortWithDay(inventoryInfo.date)}`
+                }
+              </span>
+            )}
           </div>
         </div>
 
@@ -385,11 +401,13 @@ export default function ChargesTab({
   charges: initialCharges,
   priceItems,
   billingSettings,
+  inventoryAvailability = {},
 }: {
   event: Event
   charges: EventCharge[]
   priceItems: PriceItem[]
   billingSettings: BillingSettings
+  inventoryAvailability?: Record<string, { usable: number | null; available: number | null }>
 }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -629,17 +647,23 @@ export default function ChargesTab({
                   <p className="text-xs font-medium text-brown-500">${formatMoney(catAmt)}</p>
                 </div>
                 <div className="px-4">
-                  {lines.map(c => (
+                  {lines.map(c => {
+                    const invKey = c.inventory_item_id
+                      ? `${c.inventory_item_id}:${c.charge_date ?? event.start_date}`
+                      : null
+                    const invInfo = invKey ? (inventoryAvailability[invKey] ? { ...inventoryAvailability[invKey], date: c.charge_date ?? event.start_date } : null) : null
+                    return (
                     <ChargeRow
                       key={c.id}
                       charge={c}
                       taxSettings={billingSettings}
+                      inventoryInfo={invInfo}
                       onDelete={() => {
                         if (deletingId === c.id) return
                         handleDelete(c.id)
                       }}
                     />
-                  ))}
+                  )})}
                 </div>
               </div>
             )

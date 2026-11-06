@@ -19,10 +19,11 @@ export default function Nav({ profile }: { profile: Profile }) {
   }
 
   const navLinks = [
-    { href: '/dashboard', label: 'Dashboard' },
-    { href: '/calendar', label: 'Calendar' },
-    { href: '/checklist', label: 'Checklist' },
-    { href: '/run-sheet', label: 'Run Sheet' },
+    { href: '/dashboard',  label: 'Dashboard' },
+    { href: '/calendar',   label: 'Calendar' },
+    { href: '/checklist',  label: 'Checklist' },
+    { href: '/run-sheet',  label: 'Run Sheet' },
+    { href: '/inventory',  label: 'Inventory' },
     ...(profile.role === 'admin' ? [{ href: '/settings', label: 'Settings' }] : []),
   ]
 

@@ -184,12 +184,42 @@ export type EventCharge = {
   included_people: number | null
   service_pct: number
   taxable: boolean
+  inventory_item_id: string | null
   price_overridden: boolean
   sort_order: number
   created_by: string | null
   updated_by: string | null
   created_at: string
   updated_at: string
+}
+
+export type InventoryItem = {
+  id: string
+  name: string
+  category: string
+  quantity_owned: number | null   // NULL = "Not counted yet"
+  qty_needs_repair: number
+  qty_retired: number
+  storage_location: string | null
+  notes: string | null
+  price_item_id: string | null
+  active: boolean
+  sort_order: number
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type InventoryCount = {
+  id: string
+  inventory_item_id: string
+  counted_qty: number
+  counted_by: string | null
+  counted_at: string
+  notes: string | null
+  created_by: string | null
+  created_at: string
 }
 
 // Convenience join types used by queries with nested selects
@@ -272,8 +302,20 @@ export type Database = {
       }
       event_charges: {
         Row: EventCharge
-        Insert: Omit<EventCharge, 'id' | 'created_at' | 'updated_at'> & { id?: string; created_at?: string; updated_at?: string }
+        Insert: Omit<EventCharge, 'id' | 'created_at' | 'updated_at' | 'inventory_item_id'> & { id?: string; created_at?: string; updated_at?: string; inventory_item_id?: string | null }
         Update: Partial<Omit<EventCharge, 'id'>>
+        Relationships: []
+      }
+      inventory_items: {
+        Row: InventoryItem
+        Insert: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at' | 'active' | 'qty_needs_repair' | 'qty_retired' | 'sort_order' | 'quantity_owned' | 'storage_location' | 'notes' | 'price_item_id'> & { id?: string; created_at?: string; updated_at?: string; active?: boolean; qty_needs_repair?: number; qty_retired?: number; sort_order?: number; quantity_owned?: number | null; storage_location?: string | null; notes?: string | null; price_item_id?: string | null }
+        Update: Partial<Omit<InventoryItem, 'id'>>
+        Relationships: []
+      }
+      inventory_counts: {
+        Row: InventoryCount
+        Insert: Omit<InventoryCount, 'id' | 'created_at' | 'counted_at'> & { id?: string; created_at?: string; counted_at?: string }
+        Update: Partial<Omit<InventoryCount, 'id'>>
         Relationships: []
       }
     }

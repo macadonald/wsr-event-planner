@@ -19,6 +19,8 @@ import ChargesTab from './charges-tab'
 
 type Tab = 'details' | 'assignments' | 'charges'
 
+type InventoryAvailability = Record<string, { usable: number | null; available: number | null }>
+
 type Props = {
   event: Event
   billing: EventBilling | null
@@ -34,12 +36,13 @@ type Props = {
   charges: EventCharge[]
   priceItems: PriceItem[]
   billingSettings: BillingSettings
+  inventoryAvailability: InventoryAvailability
 }
 
 export default function EventDetailClient({
   event, billing, scheduleItems, assignments, departments, notes,
   updatedByName, canEdit, profilesMap, recentHours, activity,
-  charges, priceItems, billingSettings,
+  charges, priceItems, billingSettings, inventoryAvailability,
 }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -311,6 +314,7 @@ export default function EventDetailClient({
           charges={charges}
           priceItems={priceItems}
           billingSettings={billingSettings}
+          inventoryAvailability={inventoryAvailability}
         />
       )}
 
